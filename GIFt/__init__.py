@@ -1,6 +1,5 @@
 from collections.abc import Iterator
 import torch.nn as nn
-from .utils import ModuleIterator
 from .strategies import FineTuningStrategy
 from .utils import freeze_module,trainable_parameters
 from .meta_types import FinetuableModule

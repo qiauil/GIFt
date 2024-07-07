@@ -2,7 +2,7 @@ from typing import Sequence,Tuple,Callable,Dict,Optional
 from collections.abc import Iterator
 from warnings import warn
 from .meta_types import FinetuningType
-from .layers.lora import LoRALinear
+from .layers.lora import LoRALinear,LoRAConv1d,LoRAConv2d,LoRAConv3d
 from .utils import factories as fts
 
 class FineTuningStrategy():
@@ -50,14 +50,13 @@ class LoRAFullFineTuningStrategy(FineTuningStrategy):
         default_lora_paras={
             "lora_paras":{
                 "rank":3,
-                "lora_alpha":0.0,
-                "lora_dropout":0.0,
-                "weights_type":FinetuningType.FINE_TUNE,
-                "bias_type":FinetuningType.FREEZE
             } 
         }
         checks_actions_parnames=[
             (fts.c_cname_func("Linear"),fts.a_replace_func(LoRALinear),"lora_paras"),
+            (fts.c_cname_func("Conv1d"),fts.a_replace_func(LoRAConv1d),"lora_paras"),
+            (fts.c_cname_func("Conv2d"),fts.a_replace_func(LoRAConv2d),"lora_paras"),
+            (fts.c_cname_func("Conv3d"),fts.a_replace_func(LoRAConv3d),"lora_paras"),
         ]
         super().__init__(checks_actions_parnames,default_lora_paras,lora_paras)
         
