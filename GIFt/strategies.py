@@ -10,17 +10,16 @@ class FineTuningStrategy():
     def __init__(self,
                  checks_actions_parnames:Sequence[Tuple[Callable,Callable,str]],
                  default_action_paras:Dict[str,Sequence],
-                 customized_action_paras:Optional[Dict[str,Sequence]]
+                 customized_action_paras:Optional[Dict[str,Sequence]]=None
                  ) -> None:
         self.caps=checks_actions_parnames
-        if customized_action_paras is None:
+        if customized_action_paras is not None:
             for key1 in customized_action_paras.keys():
                 for key2 in customized_action_paras[key1].keys():
                     try:
                         default_action_paras[key1][key2]=customized_action_paras[key1][key2]
                     except KeyError:
                         warn(f"Neglect unsupported fine-tuning parameter: {key1}.{key2}.",RuntimeWarning)
-
         self.action_paras=default_action_paras
         self._index=0
         
@@ -46,10 +45,13 @@ class FineTuningStrategy():
         
 class LoRAFullFineTuningStrategy(FineTuningStrategy):
     
-    def __init__(self,lora_paras=Optional[Dict[str,Dict]]) -> None:
+    def __init__(self,lora_paras:Optional[Dict[str,Dict]]=None) -> None:
         default_lora_paras={
             "lora_paras":{
                 "rank":3,
+                "lora_alpha":None, 
+                "lora_dropout":0.0, 
+                "train_bias":False
             } 
         }
         checks_actions_parnames=[

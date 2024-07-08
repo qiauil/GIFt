@@ -90,8 +90,8 @@ class LoRAConvLike(LoRALinearLike):
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0, 
                  train_bias=False):
-        h_weight=self.parent_module.weight.shape[0] # parent_module.out_channels//self.parent_module.groups
-        w_weight=self.parent_module.weight.shape[1] # parent_module.in_channels
+        h_weight=parent_module.weight.shape[0] # parent_module.out_channels//self.parent_module.groups
+        w_weight=parent_module.weight.shape[1] # parent_module.in_channels
         if isinstance(parent_module, nn.Conv1d):
             h_weight *=parent_module.kernel_size[0]
         elif isinstance(parent_module, nn.Conv2d):
