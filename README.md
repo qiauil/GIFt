@@ -35,7 +35,7 @@ class MLP(nn.Module):
 
 mlp=MLP(1, 100, 1, 5)
 print(mlp)
-print("Network before enable fine_tuning:",mlp)
+print("Network before enable fine-tuning:",mlp)
 print("Number of trainable parameters:",num_trainable_parameters(mlp))
 ```
 
@@ -47,7 +47,7 @@ print("Number of trainable parameters:",num_trainable_parameters(mlp))
       )
       (relu): ReLU()
     )
-    Network before enable fine_tuning: MLP(
+    Network before enable fine-tuning: MLP(
       (layers): ModuleList(
         (0): Linear(in_features=1, out_features=100, bias=True)
         (1-4): 4 x Linear(in_features=100, out_features=100, bias=True)
@@ -63,11 +63,11 @@ We can enable fine-tuning for this neural network with a single line of command:
 
 ```python
 enable_fine_tuning(mlp, LoRAFullFineTuningStrategy())
-print("Network afer enable fine_tuning:",mlp)
+print("Network after enable fine-tuning:",mlp)
 print("Number of trainable parameters after fine-tuning:",num_trainable_parameters(mlp))
 ```
 
-    Network afer enable fine_tuning: MLP(
+    Network after enable fine-tuning: MLP(
       (layers): ModuleList(
         (0): LoRALinear(
           (parent_module): Linear(in_features=1, out_features=100, bias=True)
@@ -84,13 +84,13 @@ print("Number of trainable parameters after fine-tuning:",num_trainable_paramete
     Number of trainable parameters after fine-tuning: 3006
 
 
-Here, `LoRAFullFineTuningStrategy` is a subclass of `FineTuningStrategy` where it can replace all Linear layers with LoRA layers and all Conv1/2/3D layers with LoRAConv1/2/3D layers. We will discuss how to build up a new fine-tuning strategy later.
+Here, `LoRAFullFineTuningStrategy` is a subclass of `FineTuningStrategy` where it can replace all Linear layers with LoRA Linear layers and all Conv1/2/3D layers with LoRAConv1/2/3D layers. We will discuss how to build up a new fine-tuning strategy later.
 
-After fine-tuning with the `enable_fine_tuning` function, there will be a new function, `trainable_parameters()`, of the network instance. We can use this function for the setup of the optimizer:
+After fine-tuning with the `enable_fine_tuning` function, the `parameters()` of the network instance will be replaced with a new function where only trainable parameters are returned:
 
 
 ```python
-optimizer = torch.optim.Adam(mlp.trainable_parameters(), lr=0.001)
+optimizer = torch.optim.Adam(mlp.parameters(), lr=0.001)
 ```
 
 You can also use `GIFt.utils.trainable_parameters(mlp)` to get the trainable parameters.
@@ -101,8 +101,8 @@ Besides, after enabling fine-tuning for the neural network, the statedict of the
 ```python
 state_dict = mlp.state_dict()
 print(state_dict.keys())
-torch.save(state_dict, "mlp.pth")
-mlp.load_state_dict(torch.load("mlp.pth"))
+torch.save(state_dict, "mlp.pt")
+mlp.load_state_dict(torch.load("mlp.pt"))
 ```
 
     dict_keys(['layers.0.lora_B', 'layers.0.lora_A', 'layers.1.lora_B', 'layers.1.lora_A', 'layers.2.lora_B', 'layers.2.lora_A', 'layers.3.lora_B', 'layers.3.lora_A', 'layers.4.lora_B', 'layers.4.lora_A', 'layers.5.lora_B', 'layers.5.lora_A'])
@@ -119,7 +119,7 @@ mlp.load_state_dict(torch.load("mlp.pth"))
 
 `enable_fine_tuning` function requires an instance of `FineTuningStrategy` class. Actually, any iterable object returns a `check` function, and an `action` function works for the `enable_fine_tuning` function. Here, the `check` function checks whether the layer satisfies some specific condition, and the `action` function will be activated if the `check` function returns true.
 
-The parameters of the `check` and `action` functions are `name, global_name, class_name, layer_obj` and `module, name, global_name, class_name, layer_obj` respectively. Let's use a simple example to show how you a fine-tuning strategy and the meaning of these parameters:
+The parameters of the `check` and `action` functions are `parent_module, name, global_name, class_name, layer_obj` respectively. Let's use a simple example to show how you a fine-tuning strategy and the meaning of these parameters:
 
 
 ```python
@@ -156,19 +156,19 @@ The following strategy will replace all the linear layer with convolution layer:
 class ExampleStrategy():
     def __init__(self):
         
-        def check_function(name, global_name, class_name, layer_obj):
+        def check_function(parent_module,name, global_name, class_name, layer_obj):
             if class_name == "Linear":
                 return True
             return False
         
-        def action_function(module,name, global_name, class_name, layer_obj):
-            print("Module",module)
+        def action_function(parent_module,name, global_name, class_name, layer_obj):
+            print("Parent Module",parent_module)
             print("Layer name:",name)
             print("Global name:",global_name)
             print("Class name:",class_name)
             print("Layer object:",layer_obj)
             print("_"*50)
-            setattr(module, name, nn.Conv2d(
+            setattr(parent_module, name, nn.Conv2d(
                 layer_obj.in_features, layer_obj.out_features,
                 kernel_size=3
             ))
@@ -183,7 +183,7 @@ class ExampleStrategy():
 enable_fine_tuning(example_mlp, ExampleStrategy())
 ```
 
-    Module ExampleMLP(
+    Parent Module ExampleMLP(
       (in_model): Linear(in_features=1, out_features=10, bias=True)
       (mid_model): MLP(
         (layers): ModuleList(
@@ -198,33 +198,33 @@ enable_fine_tuning(example_mlp, ExampleStrategy())
     Class name: Linear
     Layer object: Linear(in_features=1, out_features=10, bias=True)
     __________________________________________________
-    Module ModuleList(
+    Parent Module ModuleList(
       (0-2): 3 x Linear(in_features=10, out_features=10, bias=True)
     )
     Layer name: 0
-    Global name: layers.0
+    Global name: mid_model.layers.0
     Class name: Linear
     Layer object: Linear(in_features=10, out_features=10, bias=True)
     __________________________________________________
-    Module ModuleList(
+    Parent Module ModuleList(
       (0): Conv2d(10, 10, kernel_size=(3, 3), stride=(1, 1))
       (1-2): 2 x Linear(in_features=10, out_features=10, bias=True)
     )
     Layer name: 1
-    Global name: layers.1
+    Global name: mid_model.layers.1
     Class name: Linear
     Layer object: Linear(in_features=10, out_features=10, bias=True)
     __________________________________________________
-    Module ModuleList(
+    Parent Module ModuleList(
       (0-1): 2 x Conv2d(10, 10, kernel_size=(3, 3), stride=(1, 1))
       (2): Linear(in_features=10, out_features=10, bias=True)
     )
     Layer name: 2
-    Global name: layers.2
+    Global name: mid_model.layers.2
     Class name: Linear
     Layer object: Linear(in_features=10, out_features=10, bias=True)
     __________________________________________________
-    Module ExampleMLP(
+    Parent Module ExampleMLP(
       (in_model): Conv2d(1, 10, kernel_size=(3, 3), stride=(1, 1))
       (mid_model): MLP(
         (layers): ModuleList(
@@ -243,7 +243,7 @@ enable_fine_tuning(example_mlp, ExampleStrategy())
 
 Form the previous example, we can know that:
 * `enable_fine_tuning` function iterates over all layers from top to bottom, from outside to inside.
-* `module` parameter is a `nn.Module` representing the parent module of current layer.
+* `parent_module` parameter is a `nn.Module` representing the parent module of current layer.
 * `layer_name` parameter is a `str` representing the name of current layer.
 * `global_name` parameter is a `str` representing the global name of current layer, i.e., it contains all the name of parent layers.
 * `layer_obj` is a `nn.Module` representing the current layer.

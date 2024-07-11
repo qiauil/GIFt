@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 import torch.nn as nn
 from .strategies import FineTuningStrategy
-from .utils import freeze_module,trainable_parameters
+from .utils import freeze_module,trainable_parameters,class_name
 from .meta_types import FinetuableModule
 
 class ModuleIterator(Iterator):
@@ -35,27 +35,32 @@ class ModuleIterator(Iterator):
     def __next__(self):
         if self._index < len(self):
             layer_name, layer = self.iterations[self._index]
-            layer_class_name = self.module._modules[layer_name].__class__.__name__
-            has_child = True if self.module._modules[layer_name]._modules else False
+            layer_class_name = class_name(layer)
+            has_child = True if layer._modules else False
             global_name=self.parent_name+'.'+layer_name if self.parent_name !="" else layer_name
             self._index += 1
             return layer_name, global_name, layer_class_name, layer, has_child
         else:
             raise StopIteration
 
-def replace_modules(module:nn.Module,fine_tuning_strategy:FineTuningStrategy,parent_name:str=""):
+def modify_modules(module:nn.Module,fine_tuning_strategy:FineTuningStrategy,parent_name:str=""):
     # Replace layers with finetuable layers
     for name, global_name, class_name, layer_obj, has_child in ModuleIterator(module,parent_name):
         find=False
         if isinstance(layer_obj,FinetuableModule):
             raise ValueError(f"Layer {global_name} is already finetuable")
         for check_func,act_func in fine_tuning_strategy:
-            if check_func(name, global_name, class_name, layer_obj):
-                act_func(module,name, global_name, class_name, layer_obj)
+            if check_func(module, name, global_name, class_name, layer_obj):
+                #if isinstance(act_func,fine_tuning_strategy):
+                #    modify_modules(layer_obj,act_func,global_name)
+                #else:
+                #    act_func(module, name, global_name, class_name, layer_obj)
+                act_func(module, name, global_name, class_name, layer_obj)
+                # TODO: enable strategy as an action function
                 find=True
                 break
         if not find and has_child:
-            replace_modules(layer_obj,fine_tuning_strategy,name)
+            modify_modules(layer_obj,fine_tuning_strategy,global_name)
         else:
             freeze_module(layer_obj)
 
@@ -104,7 +109,7 @@ def enable_fine_tuning(module:nn.Module,
         None
     """
     # replace modules
-    replace_modules(module,fine_tuning_strategy)
+    modify_modules(module,fine_tuning_strategy)
     # add hook to the module to remove untrainable parameters from the state_dict
     module._register_state_dict_hook(fine_tuning_sd_hook)
     # add hook to the module to enable load_state_dict to load the finetuned model
