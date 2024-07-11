@@ -22,7 +22,6 @@ import math
 from typing import Union,Optional
 from ..utils import freeze_module,default
 from ..meta_types import FinetuningType,FinetuableModule
-torch.bmm()
 
 class LoRALayer(FinetuableModule):
     """

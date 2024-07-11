@@ -8,7 +8,7 @@ First, Let's build a neural network
 ```python
 import torch
 import torch.nn as nn
-from GIFt import enable_finetuning
+from GIFt import enable_fine_tuning
 from GIFt.strategies import LoRAFullFineTuningStrategy
 from GIFt.utils import num_trainable_parameters
 
@@ -35,7 +35,7 @@ class MLP(nn.Module):
 
 mlp=MLP(1, 100, 1, 5)
 print(mlp)
-print("Network before enable finetuning:",mlp)
+print("Network before enable fine_tuning:",mlp)
 print("Number of trainable parameters:",num_trainable_parameters(mlp))
 ```
 
@@ -47,7 +47,7 @@ print("Number of trainable parameters:",num_trainable_parameters(mlp))
       )
       (relu): ReLU()
     )
-    Network before enable finetuning: MLP(
+    Network before enable fine_tuning: MLP(
       (layers): ModuleList(
         (0): Linear(in_features=1, out_features=100, bias=True)
         (1-4): 4 x Linear(in_features=100, out_features=100, bias=True)
@@ -62,12 +62,12 @@ We can enable fine-tuning for this neural network with a single line of command:
 
 
 ```python
-enable_finetuning(mlp, LoRAFullFineTuningStrategy())
-print("Network afer enable finetuning:",mlp)
+enable_fine_tuning(mlp, LoRAFullFineTuningStrategy())
+print("Network afer enable fine_tuning:",mlp)
 print("Number of trainable parameters after fine-tuning:",num_trainable_parameters(mlp))
 ```
 
-    Network afer enable finetuning: MLP(
+    Network afer enable fine_tuning: MLP(
       (layers): ModuleList(
         (0): LoRALinear(
           (parent_module): Linear(in_features=1, out_features=100, bias=True)
@@ -86,7 +86,7 @@ print("Number of trainable parameters after fine-tuning:",num_trainable_paramete
 
 Here, `LoRAFullFineTuningStrategy` is a subclass of `FineTuningStrategy` where it can replace all Linear layers with LoRA layers and all Conv1/2/3D layers with LoRAConv1/2/3D layers. We will discuss how to build up a new fine-tuning strategy later.
 
-After fine-tuning with the `enable_finetuning` function, there will be a new function, `trainable_parameters()`, of the network instance. We can use this function for the setup of the optimizer:
+After fine-tuning with the `enable_fine_tuning` function, there will be a new function, `trainable_parameters()`, of the network instance. We can use this function for the setup of the optimizer:
 
 
 ```python
@@ -117,7 +117,7 @@ mlp.load_state_dict(torch.load("mlp.pth"))
 
 ## Training strategy
 
-`enable_finetuning` function requires an instance of `FineTuningStrategy` class. Actually, any iterable object returns a `check` function, and an `action` function works for the `enable_finetuning` function. Here, the `check` function checks whether the layer satisfies some specific condition, and the `action` function will be activated if the `check` function returns true.
+`enable_fine_tuning` function requires an instance of `FineTuningStrategy` class. Actually, any iterable object returns a `check` function, and an `action` function works for the `enable_fine_tuning` function. Here, the `check` function checks whether the layer satisfies some specific condition, and the `action` function will be activated if the `check` function returns true.
 
 The parameters of the `check` and `action` functions are `name, global_name, class_name, layer_obj` and `module, name, global_name, class_name, layer_obj` respectively. Let's use a simple example to show how you a fine-tuning strategy and the meaning of these parameters:
 
@@ -180,7 +180,7 @@ class ExampleStrategy():
     def __getitem__(self, index):
         return self.check_actions[index]
     
-enable_finetuning(example_mlp, ExampleStrategy())
+enable_fine_tuning(example_mlp, ExampleStrategy())
 ```
 
     Module ExampleMLP(
@@ -242,7 +242,7 @@ enable_finetuning(example_mlp, ExampleStrategy())
 
 
 Form the previous example, we can know that:
-* `enable_finetuning` function iterates over all layers from top to bottom, from outside to inside.
+* `enable_fine_tuning` function iterates over all layers from top to bottom, from outside to inside.
 * `module` parameter is a `nn.Module` representing the parent module of current layer.
 * `layer_name` parameter is a `str` representing the name of current layer.
 * `global_name` parameter is a `str` representing the global name of current layer, i.e., it contains all the name of parent layers.
@@ -269,7 +269,7 @@ class ExampleStrategy2(FineTuningStrategy):
         super().__init__(checks_actions_parnames, default_action_paras, customized_action_paras)
 
 example_mlp=ExampleMLP()
-enable_finetuning(example_mlp, ExampleStrategy2())
+enable_fine_tuning(example_mlp, ExampleStrategy2())
 print(example_mlp)
 ```
 
@@ -297,7 +297,7 @@ print(LoRAFullFineTuningStrategy().paras())
     {'lora_paras': {'rank': 3, 'lora_alpha': None, 'lora_dropout': 0.0, 'train_bias': False}}
 
 
-The last thing we need to mention is that we recommend making all the new layers in the fine-tuning model an instance of `GIFt.meta_types.FinetuableModule` as the `enable_finetuning` function will check whether a layer is already an instance of the `FinetuableModule` to avoid incorrectly duplicate setting networks.
+The last thing we need to mention is that we recommend making all the new layers in the fine-tuning model an instance of `GIFt.meta_types.FinetuableModule` as the `enable_fine_tuning` function will check whether a layer is already an instance of the `FinetuableModule` to avoid incorrectly duplicate setting networks.
 
 ## An example of applying LoRA fine-tuning to attention layers
 
@@ -385,21 +385,21 @@ class TwoDFieldMultiHeadAttention(nn.Module):
 
 ```python
 sequence_attention=SequenceMultiHeadAttention(10,10,10,2,5,10)
-print("sequence_attention before enable finetuning:")
+print("sequence_attention before enable fine_tuning:")
 print(sequence_attention)
-enable_finetuning(sequence_attention, LoRAFullFineTuningStrategy())
-print("sequence_attention after enable finetuning:")
+enable_fine_tuning(sequence_attention, LoRAFullFineTuningStrategy())
+print("sequence_attention after enable fine_tuning:")
 print(sequence_attention)
 print("")
-print("field attention before enable finetuning:")
+print("field attention before enable fine_tuning:")
 field_attention=TwoDFieldMultiHeadAttention(10,10,10,2,5,10)
-print("field attention after enable finetuning:")
+print("field attention after enable fine_tuning:")
 print(field_attention)
-enable_finetuning(field_attention, LoRAFullFineTuningStrategy())
+enable_fine_tuning(field_attention, LoRAFullFineTuningStrategy())
 print(field_attention)
 ```
 
-    sequence_attention before enable finetuning:
+    sequence_attention before enable fine_tuning:
     SequenceMultiHeadAttention(
       (w_q): Linear(in_features=10, out_features=10, bias=False)
       (w_k): Linear(in_features=10, out_features=10, bias=False)
@@ -407,7 +407,7 @@ print(field_attention)
       (mha): MultiHeadAttentionBase()
       (w_o): Linear(in_features=10, out_features=10, bias=False)
     )
-    sequence_attention after enable finetuning:
+    sequence_attention after enable fine_tuning:
     SequenceMultiHeadAttention(
       (w_q): LoRALinear(
         (parent_module): Linear(in_features=10, out_features=10, bias=False)
@@ -424,8 +424,8 @@ print(field_attention)
       )
     )
     
-    field attention before enable finetuning:
-    field attention after enable finetuning:
+    field attention before enable fine_tuning:
+    field attention after enable fine_tuning:
     TwoDFieldMultiHeadAttention(
       (w_q): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
       (w_k): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)

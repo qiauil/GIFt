@@ -16,12 +16,12 @@ def default(object,default_value):
 
 def freeze_module(module: nn.Module, weights_type: FinetuningType=FinetuningType.FINE_TUNE,bias_type: FinetuningType=FinetuningType.FREEZE):
     """
-    Freezes or unfreezes the parameters of a given module based on the specified finetuning types.
+    Freezes or unfreezes the parameters of a given module based on the specified fine_tuning types.
 
     Args:
         module (nn.Module): The module whose parameters need to be frozen or unfrozen.
-        weights_type (FinetuningType, optional): The finetuning type for weight parameters. Defaults to FinetuningType.FINE_TUNE.
-        bias_type (FinetuningType, optional): The finetuning type for bias parameters. Defaults to FinetuningType.FREEZE.
+        weights_type (FinetuningType, optional): The fine_tuning type for weight parameters. Defaults to FinetuningType.FINE_TUNE.
+        bias_type (FinetuningType, optional): The fine_tuning type for bias parameters. Defaults to FinetuningType.FREEZE.
     """
     for name,param in module.named_parameters():
         if "weight" in name and weights_type == FinetuningType.TRAIN:
