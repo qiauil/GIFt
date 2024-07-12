@@ -1,4 +1,5 @@
 # GIFt: Generic and Intuitive Fine-tuning Library
+# NOTE: EXPIRED  
 
 ## Examples of using GIFt for fine-tuning:
 
@@ -119,7 +120,7 @@ mlp.load_state_dict(torch.load("mlp.pt"))
 
 `enable_fine_tuning` function requires an instance of `FineTuningStrategy` class. Actually, any iterable object returns a `check` function, and an `action` function works for the `enable_fine_tuning` function. Here, the `check` function checks whether the layer satisfies some specific condition, and the `action` function will be activated if the `check` function returns true.
 
-The parameters of the `check` and `action` functions are `parent_module, name, global_name, class_name, layer_obj` respectively. Let's use a simple example to show how you a fine-tuning strategy and the meaning of these parameters:
+The parameters of the `check` and `action` functions are `parent_module, name, global_name, class_name, current_module` respectively. Let's use a simple example to show how you a fine-tuning strategy and the meaning of these parameters:
 
 
 ```python
@@ -156,20 +157,20 @@ The following strategy will replace all the linear layer with convolution layer:
 class ExampleStrategy():
     def __init__(self):
         
-        def check_function(parent_module,name, global_name, class_name, layer_obj):
+        def check_function(parent_module,name, global_name, class_name, current_module):
             if class_name == "Linear":
                 return True
             return False
         
-        def action_function(parent_module,name, global_name, class_name, layer_obj):
+        def action_function(parent_module,name, global_name, class_name, current_module):
             print("Parent Module",parent_module)
             print("Layer name:",name)
             print("Global name:",global_name)
             print("Class name:",class_name)
-            print("Layer object:",layer_obj)
+            print("Layer object:",current_module)
             print("_"*50)
             setattr(parent_module, name, nn.Conv2d(
-                layer_obj.in_features, layer_obj.out_features,
+                current_module.in_features, current_module.out_features,
                 kernel_size=3
             ))
         self.check_actions=[(check_function, action_function)]
@@ -246,7 +247,7 @@ Form the previous example, we can know that:
 * `parent_module` parameter is a `nn.Module` representing the parent module of current layer.
 * `layer_name` parameter is a `str` representing the name of current layer.
 * `global_name` parameter is a `str` representing the global name of current layer, i.e., it contains all the name of parent layers.
-* `layer_obj` is a `nn.Module` representing the current layer.
+* `current_module` is a `nn.Module` representing the current layer.
 
 `FineTuningStrategy` class is a helper class which makes your procedure of designing the training strategy more simpler. It also support additional parameters for the action `function`. You can refer to the source code of `LoRAFullFineTuningStrategy()` to see how it works. Here we give an example of using `FineTuningStrategy` class to build up the previous strategy: 
 
@@ -259,14 +260,14 @@ import GIFt.utils.factories as fts
 class ExampleStrategy2(FineTuningStrategy):
     
     def __init__(self, kernel_size=3) -> None:
-        default_action_paras = {"conv_para":{"kernel_size": 3}}
+        action_paras = {"conv_para":{"kernel_size": 3}}
         customized_action_paras = {"conv_para":{"kernel_size": kernel_size}}
         checks_actions_parnames = [
-            (fts.c_cname_func("Linear"),
-             fts.a_replace_func(lambda layer_obj,kernel_size: nn.Conv2d(layer_obj.in_features, layer_obj.out_features, kernel_size=kernel_size)),
+            (fts.c_cname_equal("Linear"),
+             fts.a_replace(lambda current_module,kernel_size: nn.Conv2d(current_module.in_features, current_module.out_features, kernel_size=kernel_size)),
              "conv_para")
         ]
-        super().__init__(checks_actions_parnames, default_action_paras, customized_action_paras)
+        super().__init__(checks_actions_parnames, action_paras, customized_action_paras)
 
 example_mlp=ExampleMLP()
 enable_fine_tuning(example_mlp, ExampleStrategy2())
