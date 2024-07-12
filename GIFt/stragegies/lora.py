@@ -2,6 +2,7 @@ from typing import Callable, Dict,Optional, Sequence, Tuple
 from . import FineTuningStrategy
 from ..layers.lora import LoRALinear,LoRAConv1d,LoRAConv2d,LoRAConv3d
 from ..utils import factories as fts
+import torch.nn as nn
 
 class LoRAFineTuningStrategyBasis(FineTuningStrategy):
     
@@ -11,6 +12,7 @@ class LoRAFineTuningStrategyBasis(FineTuningStrategy):
                  lora_alpha:Optional[float]=None,
                  lora_dropout:float=0.0,
                  train_bias:bool=False,
+                 constrain_type=None,
                  ) -> None:
         lora_paras={"lora":{
             "rank":rank,
@@ -19,7 +21,7 @@ class LoRAFineTuningStrategyBasis(FineTuningStrategy):
             "train_bias":train_bias
         }
         }
-        super().__init__(checks_actions_parnames,lora_paras)
+        super().__init__(checks_actions_parnames,lora_paras,constrain_type)
 
 class LoRALinearFineTuningStrategy(LoRAFineTuningStrategyBasis):
     

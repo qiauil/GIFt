@@ -10,9 +10,11 @@ class FineTuningStrategy():
     def __init__(self,
                  checks_actions_parnames:Sequence[Tuple[Callable,Callable,str]],
                  action_paras:Dict[str,Sequence],
+                 constrain_type=None
                  ) -> None:
         self.caps=checks_actions_parnames
         self.action_paras=action_paras    
+        self.constrain_type=default(constrain_type,nn.Module)
         
     def __call__(self,
                  parent_module:nn.Module, 
@@ -21,6 +23,8 @@ class FineTuningStrategy():
                  class_name:str, 
                  current_module:nn.Module,
                  high_priority_paras:Optional[dict]=None) -> Any:
+        if not isinstance(parent_module,self.constrain_type):
+            raise ValueError(f"Strategy {type} only work with {self.constrain_type} type module, but got {type(parent_module)}")
         paras=default(high_priority_paras,self.action_paras)
         for check_func,act_func,act_para in self.caps:
             if check_func(parent_module, name, global_name, class_name, current_module):
