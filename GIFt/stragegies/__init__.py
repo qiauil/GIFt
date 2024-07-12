@@ -1,20 +1,21 @@
 from typing import Any, Sequence,Tuple,Callable,Dict,Optional
 from warnings import warn
-from ..layers.lora import LoRALinear,LoRAConv1d,LoRAConv2d,LoRAConv3d
-from ..utils import factories as fts
 from ..utils import default
 import torch.nn as nn
+from typing import Type,Union,Optional,Dict
 
 class FineTuningStrategy():
     
     def __init__(self,
                  checks_actions_parnames:Sequence[Tuple[Callable,Callable,str]],
                  action_paras:Dict[str,Sequence],
-                 constrain_type=None
+                 constrain_type:Optional[Union[Sequence[Type],Type]]=None
                  ) -> None:
         self.caps=checks_actions_parnames
         self.action_paras=action_paras    
-        self.constrain_type=default(constrain_type,nn.Module)
+        self.constrain_type=default(constrain_type,[nn.Module])
+        if not isinstance(self.constrain_type,Sequence):
+            self.constrain_type=[self.constrain_type]
         
     def __call__(self,
                  parent_module:nn.Module, 
@@ -23,8 +24,11 @@ class FineTuningStrategy():
                  class_name:str, 
                  current_module:nn.Module,
                  high_priority_paras:Optional[dict]=None) -> Any:
-        if not isinstance(parent_module,self.constrain_type):
-            raise ValueError(f"Strategy {type} only work with {self.constrain_type} type module, but got {type(parent_module)}")
+        type_check=[not isinstance(parent_module,constrain_type) for constrain_type in self.constrain_type]
+        if all(type_check):
+            e_msg=f"Unsupport module type {type(parent_module)} for strategy {type(self)};"
+            e_msg+=f"Supported module types are {self.constrain_type}."
+            raise ValueError(e_msg)
         paras=default(high_priority_paras,self.action_paras)
         for check_func,act_func,act_para in self.caps:
             if check_func(parent_module, name, global_name, class_name, current_module):
