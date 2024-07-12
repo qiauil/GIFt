@@ -45,11 +45,11 @@ class ModuleIterator(Iterator):
 
 def modify_modules(module:nn.Module,fine_tuning_strategy:FineTuningStrategy,parent_name:str=""):
     # Replace layers with finetuable layers
-    for name, global_name, class_name, current_module, has_child in ModuleIterator(module,parent_name):
+    for current_name, global_name, class_name, current_module, has_child in ModuleIterator(module,parent_name):
         find=False
         if isinstance(current_module,FinetuableModule):
             raise ValueError(f"Layer {global_name} is already finetuable")
-        find=fine_tuning_strategy(module,name,global_name,class_name,current_module)
+        find=fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
         if not find and has_child:
             modify_modules(current_module,fine_tuning_strategy,global_name)
         else:

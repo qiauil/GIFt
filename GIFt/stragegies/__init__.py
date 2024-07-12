@@ -19,7 +19,7 @@ class FineTuningStrategy():
         
     def __call__(self,
                  parent_module:nn.Module, 
-                 name:str, 
+                 current_name:str, 
                  global_name:str, 
                  class_name:str, 
                  current_module:nn.Module,
@@ -31,12 +31,12 @@ class FineTuningStrategy():
             raise ValueError(e_msg)
         paras=default(high_priority_paras,self.action_paras)
         for check_func,act_func,act_para in self.caps:
-            if check_func(parent_module, name, global_name, class_name, current_module):
+            if check_func(parent_module, current_name, global_name, class_name, current_module):
                 if isinstance(act_para,FineTuningStrategy):
-                   if act_func(parent_module, name, global_name, class_name, current_module,paras[act_para]):
+                   if act_func(parent_module, current_name, global_name, class_name, current_module,paras[act_para]):
                        return True
                 else:
-                    act_func(parent_module, name, global_name, class_name, current_module,**paras[act_para])
+                    act_func(parent_module, current_name, global_name, class_name, current_module,**paras[act_para])
                     return True
         return False
 
