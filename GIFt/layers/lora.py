@@ -119,7 +119,7 @@ class LoRALinearLike(LoRALayer):
         if len(weight_shape) != 2 or (weight_shape[0] != h_weight or weight_shape[1] != w_weight):
             if torch.numel(self.parent_module.weight) != w_weight * h_weight:
                 raise ValueError('The shape of the parent module weight is not compatible with the LoRA input and output size')
-            self.shape_transfer = lambda ori_tensor: ori_tensor.view(h_weight, rank, w_weight)
+            self.shape_transfer = lambda ori_tensor: ori_tensor.view(self.parent_module.weight.shape)
         else:
             self.shape_transfer = lambda ori_tensor: ori_tensor
         bias_type = FinetuningType.FREEZE if not train_bias else FinetuningType.TRAIN
@@ -127,6 +127,11 @@ class LoRALinearLike(LoRALayer):
                       weights_type=FinetuningType.FINE_TUNE,
                       bias_type=bias_type)
 
+    '''
+    We notice that in PyTorch Lighning, the train loop will actually not call the train() function of the module to enable 
+    training. Thus, for safety, we will not override the train() function of the module. Instead, we will judge whether we
+    are in the training model in forward() function.
+    
     def train(self, mode: bool = True):
         """
         Sets the module in training mode and updates the weights accordingly.
@@ -144,7 +149,7 @@ class LoRALinearLike(LoRALayer):
             if not self.merged:
                 self.parent_module.weight.data += self.shape_transfer(self.lora_B @ self.lora_A) * self.scaling
                 self.merged = True
-
+    '''
     def lora_weight(self):
         """
         Computes the LoRA weight.
@@ -153,6 +158,18 @@ class LoRALinearLike(LoRALayer):
             torch.Tensor: The LoRA weight.
         """
         return self.shape_transfer(self.lora_B @ self.lora_A) * self.scaling
+
+    def merge_weight(self):
+        if self.merged:
+            raise ValueError('The weight is already merged')
+        self.parent_module.weight.data += self.lora_weight()
+        self.merged = True
+    
+    def unmerge_weight(self):
+        if not self.merged:
+            raise ValueError('The weight is already unmerged')
+        self.parent_module.weight.data -= self.lora_weight()
+        self.merged = False
 
     def forward(self, x: torch.Tensor):
         """
@@ -200,21 +217,30 @@ class LoRAConvLike(LoRALinearLike):
             h_weight *= parent_module.kernel_size[0]
             w_weight *= parent_module.kernel_size[1]* parent_module.kernel_size[2]
         super().__init__(parent_module, h_weight, w_weight, rank, lora_alpha, lora_dropout, train_bias)
+        
 
     def forward(self, x):
-        if not self.merged:
+        if self.training:
+            if self.merged:
+                self.unmerge_weight()
             if self.run_dropout:
-                self.conv(x)+self.conv._conv_forward(
+                '''
+                see comments in LoRALinearLike
+                '''
+                self.parent_module(x)+self.parent_module._conv_forward(
                 self.lora_dropout(x), 
                 self.lora_weight(),
                 bias=None)
             else:    
-                return self.conv._conv_forward(
+                return self.parent_module._conv_forward(
                     x, 
-                    self.conv.weight + self.lora_weight(),
-                    self.conv.bias
+                    self.parent_module.weight + self.lora_weight(),
+                    self.parent_module.bias
                 )
-        return self.conv(x)
+        else:
+            if not self.merged:
+                self.merge_weight()
+        return self.parent_module(x)
 
 class LoRALinear(LoRALinearLike):
     """
@@ -241,7 +267,9 @@ class LoRALinear(LoRALinearLike):
                          train_bias)
         
     def forward(self, x: torch.Tensor):
-        if not self.merged:
+        if self.training:
+            if self.merged:
+                self.unmerge_weight()
             if self.run_dropout:
                 '''
                 There are three method to add the lora_weight to the parent_module:
@@ -253,13 +281,15 @@ class LoRALinear(LoRALinearLike):
                 Thus, if dropout is used, the second method is the best choice, otherwise the last one is the best choice.
                 '''
                 return self.parent_module(x)+F.linear(self.lora_dropout(x),
-                                                      self.lora_weight(),
-                                                      bias=None)
+                                                    self.lora_weight(),
+                                                    bias=None)
             else:
                 return F.linear(x,
                                 self.parent_module.weight+self.lora_weight(),
                                 self.parent_module.bias)
         else:
+            if not self.merged:
+                self.merge_weight()
             return self.parent_module(x)  
 
 class LoRAConv1d(LoRAConvLike):

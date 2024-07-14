@@ -24,11 +24,11 @@ class FineTuningStrategy():
                  class_name:str, 
                  current_module:nn.Module,
                  high_priority_paras:Optional[dict]=None) -> Any:
-        type_check=[not isinstance(parent_module,constrain_type) for constrain_type in self.constrain_type]
-        if all(type_check):
-            e_msg=f"Unsupport module type {type(parent_module)} for strategy {type(self)};"
-            e_msg+=f"Supported module types are {self.constrain_type}."
-            raise ValueError(e_msg)
+        #type_check=[not isinstance(parent_module,constrain_type) for constrain_type in self.constrain_type]
+        #if all(type_check):
+        #    e_msg=f"Unsupport module type {type(parent_module)} for strategy {type(self)};"
+        #    e_msg+=f"Supported module types are {self.constrain_type}."
+        #    raise ValueError(e_msg)
         paras=default(high_priority_paras,self.action_paras)
         for check_func,act_func,act_para in self.caps:
             if check_func(parent_module, current_name, global_name, class_name, current_module):
