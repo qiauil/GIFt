@@ -30,7 +30,7 @@ class LoRALayer(FinetuableModule):
     Args:
         rank (int): The rank of the LoRALayer. Must be greater than 0.
         lora_alpha (Optional[int]): The alpha value for LoRA. Defaults to None.
-            In the LoRA paper, the alpha is used to rescale the Lora weight :math:`BA` as math:`\frac{\alpha}{r}BA`.
+            In the LoRA paper, the alpha is used to rescale the LoRA weight :math:`BA` as math:`\frac{\alpha}{r}BA`.
             If None, the alpha value is set to the rank. So the final scaling factor is always 1, which is the same as the LoRA paper.
         lora_dropout (float): The optional dropout rate for LoRA. Defaults to 0.0.
     """
@@ -185,7 +185,7 @@ class LoRALinearLike(LoRALayer):
 
 class LoRAConvLike(LoRALinearLike):
     """
-    Convolutional layer with LoRA. It is recommended to use `LoraConv1d`, `LoraConv2d`, and `LoraConv3d` instead of this class.
+    Convolutional layer with LoRA. It is recommended to use `LoRAConv1d`, `LoRAConv2d`, and `LoRAConv3d` instead of this class.
 
     Args:
         parent_module (Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]): The parent convolutional module.
