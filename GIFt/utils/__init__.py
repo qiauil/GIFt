@@ -42,5 +42,5 @@ def num_trainable_parameters(module:nn.Module):
 def num_parameters(module:nn.Module):
     return sum(p.numel() for p in module.parameters())
 
-def class_name(obj):
+def get_class_name(obj):
     return obj.__class__.__name__
