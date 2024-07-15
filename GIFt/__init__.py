@@ -73,10 +73,11 @@ def modify_modules(module:nn.Module,
         if isinstance(current_module,FinetuableModule):
             raise ValueError(f"Layer {global_name} is already finetuable")
         find=fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
-        if not find and has_child:
-            modify_modules(current_module,fine_tuning_strategy,global_name,recurrence_level+1)
-        else:
-            freeze_module(current_module)
+        if not find:
+            if has_child:
+                modify_modules(current_module,fine_tuning_strategy,global_name)
+            else:
+                freeze_module(current_module)
 
 
 def fine_tuning_sd_hook(module, state_dict, *args, **kwargs):
