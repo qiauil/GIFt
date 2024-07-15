@@ -46,7 +46,7 @@ class ModuleIterator(Iterator):
 def modify_modules(module:nn.Module,
                    fine_tuning_strategy:FineTuningStrategy,
                    parent_name:str="",
-                   recurrence_level=0):
+                   recurrence_level:int=0):
     """
     Recursively modifies the modules in a given module based on a fine-tuning strategy.
 
@@ -75,7 +75,7 @@ def modify_modules(module:nn.Module,
         find=fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
         if not find:
             if has_child:
-                modify_modules(current_module,fine_tuning_strategy,global_name)
+                modify_modules(current_module,fine_tuning_strategy,global_name,recurrence_level+1)
             else:
                 freeze_module(current_module)
 
