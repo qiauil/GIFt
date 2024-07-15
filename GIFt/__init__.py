@@ -62,7 +62,7 @@ def modify_modules(module:nn.Module,
     Returns:
         None
     """
-    if recurrence_level==0:
+    if recurrence_level==0 and len(fine_tuning_strategy.constrain_type)>0:
         type_check=[not isinstance(module,constrain_type) for constrain_type in fine_tuning_strategy.constrain_type]
         if all(type_check):
             e_msg=f"Unsupport module type {get_class_name(module)} for strategy {get_class_name(fine_tuning_strategy)};"

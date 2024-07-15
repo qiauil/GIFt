@@ -1,5 +1,6 @@
 import torch.nn as nn
 from ..meta_types import FinetuningType
+from typing import Sequence
 
 def default(object,default_value):
     """
@@ -44,3 +45,16 @@ def num_parameters(module:nn.Module):
 
 def get_class_name(obj):
     return obj.__class__.__name__
+
+def take_intersection(sets:Sequence[Sequence]):
+    initial_set=sets[0]
+    intersection=[]
+    for element in initial_set:
+        not_in_all=False    
+        for set_i in sets[1:]:
+            if element not in set_i:
+                not_in_all=True
+                break
+        if not not_in_all:
+            intersection.append(element)
+    return intersection
