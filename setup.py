@@ -15,7 +15,7 @@ def get_install_requires():
 
 setuptools.setup(
     name="GIFt",
-    version="0.0.43",
+    version="0.0.45",
     author="Qiang Liu",
     author_email="qiangliu.7@outlook.com",
     description="GIFt: Generic and Intuitive Fine-tuning Library",
