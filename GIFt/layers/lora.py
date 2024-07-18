@@ -19,7 +19,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import os
 from typing import Union,Optional
+from warnings import warn
 from ..utils import freeze_module,default
 from ..meta_types import FinetuningType,FinetuableModule
 
@@ -108,6 +110,17 @@ class LoRALinearLike(LoRALayer):
                  lora_dropout: float = 0,
                  train_bias: bool = False):
         super().__init__(rank, lora_alpha, lora_dropout)
+        if h_weight*w_weight < rank*(h_weight+w_weight):
+            msg="Your rank is so large that the number of parameters in the LoRA decomposition is larger than the original weight matrix."
+            msg += os.linesep
+            msg+=r"Number of parameters in origional weight matrix: ${}\times{}={}$.".format(h_weight,w_weight,h_weight*w_weight)
+            msg += os.linesep
+            msg+=r"Number of parameters in LoRA decomposition: ${}\times{}+{}\times{}={}$.".format(h_weight,
+                                                                                                   rank,
+                                                                                                   rank,
+                                                                                                   w_weight,rank*(h_weight+w_weight)
+                                                                                                   )
+            raise warn(msg)
         self.parent_module = parent_module
         # Actual trainable parameters
         self.lora_B = nn.Parameter(self.parent_module.weight.new_zeros((h_weight, rank)))
