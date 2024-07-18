@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
-'''
+r'''
 LoRA: Low-Rank Adaptation of Large Language Models: https://arxiv.org/abs/2106.09685
 
-.. math::
+$$
     W = W_0+BA
+$$
 where
-.. math::
-    \text{Size of }W_0:(h,w)
-    \text{Size of }B:(h,r)
+$$
+\begin{matrix}
+    \text{Size of }W_0:(h,w)\\
+    \text{Size of }B:(h,r)\\
     \text{Size of }A:(r,w)
+\end{matrix}
+$$
 
-where r is the rank.
+Here, $r$ is the rank.
 
 modified from: https://github.com/microsoft/LoRA
 '''
@@ -22,12 +26,13 @@ import math
 import os
 from typing import Union,Optional
 from warnings import warn
-from ..utils import freeze_module,default
-from ..meta_types import FinetuningType,FinetuableModule
+from ..utils import default
+from ..utils.network_tool import conv_weight_hw
+from ..meta_types import FinetuableModule
 
 class LoRALayer(FinetuableModule):
     """
-    LoRALayer is a class that represents a layer in the LoRA (Learnable Rank Aggregation) model.
+    Base class of LoRA fine-tuning layers.
 
     Args:
         rank (int): The rank of the LoRALayer. Must be greater than 0.
@@ -135,10 +140,7 @@ class LoRALinearLike(LoRALayer):
             self.shape_transfer = lambda ori_tensor: ori_tensor.view(self.parent_module.weight.shape)
         else:
             self.shape_transfer = lambda ori_tensor: ori_tensor
-        bias_type = FinetuningType.FREEZE if not train_bias else FinetuningType.TRAIN
-        freeze_module(self.parent_module,
-                      weights_type=FinetuningType.FINE_TUNE,
-                      bias_type=bias_type)
+        self.parent_module.bias.requires_grad = train_bias
 
     '''
     We notice that in PyTorch Lighning, the train loop will actually not call the train() function of the module to enable 
@@ -196,9 +198,10 @@ class LoRALinearLike(LoRALayer):
         """
         raise NotImplementedError('This is an abstract class, please use LoRALinear')
 
-class LoRAConvLike(LoRALinearLike):
+class LoRAConv(LoRALinearLike):
     """
-    Convolutional layer with LoRA. It is recommended to use `LoRAConv1d`, `LoRAConv2d`, and `LoRAConv3d` instead of this class.
+    LoRA based Convolutional layer. 
+    You can use `LoRAConv1d`, `LoRAConv2d`, and `LoRAConv3d` instead of this class.
 
     Args:
         parent_module (Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]): The parent convolutional module.
@@ -213,22 +216,7 @@ class LoRAConvLike(LoRALinearLike):
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0, 
                  train_bias=False):
-        '''
-        The weight of Convolution layer is 
-        .. math::
-            (\text{out\_channels}, \frac{\text{in\_channels}}{\text{groups}},\text{kernel\_size[0]}, \text{kernel\_size[1] (Conv2d and Conv3d)}, \text{kernel\_size[2] (Conv3d)})
-        we need to separate the weight shape of kernels into B and A according to different convolution types.
-        '''
-        h_weight=parent_module.weight.shape[0] # parent_module.out_channels
-        w_weight=parent_module.weight.shape[1] # parent_module.in_channels//self.parent_module.groups
-        if isinstance(parent_module, nn.Conv1d):
-            w_weight *=parent_module.kernel_size[0]
-        elif isinstance(parent_module, nn.Conv2d):
-            h_weight *= parent_module.kernel_size[0]
-            w_weight *= parent_module.kernel_size[1]
-        elif isinstance(parent_module, nn.Conv3d):
-            h_weight *= parent_module.kernel_size[0]
-            w_weight *= parent_module.kernel_size[1]* parent_module.kernel_size[2]
+        h_weight, w_weight = conv_weight_hw(parent_module)
         super().__init__(parent_module, h_weight, w_weight, rank, lora_alpha, lora_dropout, train_bias)
         
 
@@ -257,7 +245,7 @@ class LoRAConvLike(LoRALinearLike):
 
 class LoRALinear(LoRALinearLike):
     """
-    Linear layer with LoRA.
+    LoRA based Linear layer.
 
     Args:
         parent_module nn.Linear: The parent linear module.
@@ -272,7 +260,8 @@ class LoRALinear(LoRALinearLike):
                  rank: int, 
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0.0, 
-                 train_bias=False):        super().__init__(parent_module, 
+                 train_bias=False):        
+        super().__init__(parent_module, 
                          parent_module.out_features, 
                          parent_module.in_features, 
                          rank, lora_alpha, 
@@ -305,9 +294,9 @@ class LoRALinear(LoRALinearLike):
                 self.merge_weight()
             return self.parent_module(x)  
 
-class LoRAConv1d(LoRAConvLike):
+class LoRAConv1d(LoRAConv):
     """
-    LoRAConv1d is a class that represents a 1D LoRA convolutional layer.
+    A LoRA based Conv1d layer.
 
     Args:
         parent_module (nn.Conv1d): The parent module of the LoRAConv1d layer.
@@ -325,9 +314,9 @@ class LoRAConv1d(LoRAConvLike):
                  train_bias=False):
         super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias)
 
-class LoRAConv2d(LoRAConvLike):
+class LoRAConv2d(LoRAConv):
     """
-    LoRAConv1d is a class that represents a 2D LoRA convolutional layer.
+    A LoRA based Conv2d layer.
 
     Args:
         parent_module (nn.Conv2d): The parent module of the LoRAConv1d layer.
@@ -345,9 +334,9 @@ class LoRAConv2d(LoRAConvLike):
                 train_bias=False):
         super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias)
 
-class LoRAConv3d(LoRAConvLike):
+class LoRAConv3d(LoRAConv):
     """
-    LoRAConv3d is a class that represents a 2D LoRA convolutional layer.
+    A LoRA based Conv3d layer.
 
     Args:
         parent_module (nn.Conv3d): The parent module of the LoRAConv1d layer.

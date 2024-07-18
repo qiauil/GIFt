@@ -1,7 +1,8 @@
 from collections.abc import Iterator
 import torch.nn as nn
 from .stragegies import FineTuningStrategy
-from .utils import freeze_module,trainable_parameters,get_class_name
+from .utils import get_class_name
+from .utils.network_tool import freeze_module,trainable_parameters
 from .meta_types import FinetuableModule
 
 class ModuleIterator(Iterator):
@@ -118,7 +119,7 @@ def enable_fine_tuning(module:nn.Module,
         replace_parameter_function (bool): Whether to replace the `parameters` function of the module.
             If True, the `parameters` function will only return trainable parameters. This helps you 
             avoiding you modifying your optimizer initialization code. If you set it as False, you 
-            can use the `trainable_parameters` function from `GIFt.utils` to get trainable parameters of 
+            can use the `trainable_parameters` function from `GIFt.utils.network_tool` to get trainable parameters of 
             your network for an optimizer.
 
     Returns:
