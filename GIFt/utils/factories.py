@@ -17,9 +17,9 @@ action_func (function): A function that takes in the following parameters and pe
 '''
 
 import torch.nn as nn
-from typing import Callable
+from typing import Callable,Sequence
 
-def c_name_equal(target_name:str):
+def c_name_equal2(target_name:str):
     """
     Returns a check function that checks if the module name is equal to the target_name.
 
@@ -30,10 +30,31 @@ def c_name_equal(target_name:str):
         check_func (function)
     """
     def check_func(parent_module:nn.Module, current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        if current_name==target_name:
+            return True
+        else:
+            return False
+    return check_func
+
+def c_name_equal2_sequence(target_names:Sequence[str]):
+    """
+    Returns a check function that checks if the module name is equal to one of the target_names.
+
+    Args:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module, 
+                   current_name:str, 
+                   global_name:str, 
+                   class_name:str, 
+                   current_module:nn.Module):
+        for target_name in target_names: 
             if current_name==target_name:
                 return True
-            else:
-                return False
+        return False
     return check_func
 
 def c_name_in(target_name:str):
@@ -53,7 +74,24 @@ def c_name_in(target_name:str):
             return False
     return check_func
 
-def c_cname_equal(target_classname:str):
+def c_name_in_list(target_names:Sequence[str]):
+    """
+    Returns a check function that checks if the one of the target_names is in the module name.
+
+    Parameters:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        for target_name in target_names:
+            if target_name in current_name:
+                return True
+        return False
+    return check_func
+
+def c_cname_equal2(target_classname:str):
     """
     Returns a check function that checks if the module class name is equal to the target_name.
 
@@ -68,6 +106,23 @@ def c_cname_equal(target_classname:str):
                 return True
             else:
                 return False
+    return check_func
+
+def c_cname_equal2_sequence(target_classnames:Sequence[str]):
+    """
+    Returns a check function that checks if the module class name is equal to one of the target_names.
+
+    Args:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        for target_classname in target_classnames:
+            if class_name==target_classname:
+                return True
+        return False
     return check_func
 
 def c_cname_in(target_classname:str):
@@ -85,6 +140,23 @@ def c_cname_in(target_classname:str):
                 return True
             else:
                 return False
+    return check_func
+
+def c_cname_in_list(target_classnames:Sequence[str]):
+    """
+    Returns a check function that checks if the one of the target_names is in the module class name.
+
+    Parameters:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        for target_classname in target_classnames:
+            if target_classname in class_name:
+                return True
+        return False
     return check_func
 
 def a_replace(replace_func:Callable):

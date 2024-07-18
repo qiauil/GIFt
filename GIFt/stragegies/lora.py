@@ -33,7 +33,7 @@ class LoRALinearFineTuningStrategy(LoRAConfigMixin,FineTuningStrategy):
         LoRAConfigMixin.__init__(self,rank,lora_alpha,lora_dropout,train_bias)
         FineTuningStrategy.__init__(self,
                                     [
-                                        (fts.c_cname_equal("Linear"),fts.a_replace(LoRALinear),self.lora_configs()),
+                                        (fts.c_cname_equal2("Linear"),fts.a_replace(LoRALinear),self.lora_configs()),
                                     ]
                                     )
         
@@ -46,9 +46,9 @@ class LoRAConvFineTuningStrategy(LoRAConfigMixin,FineTuningStrategy):
         LoRAConfigMixin.__init__(self,rank,lora_alpha,lora_dropout,train_bias)
         FineTuningStrategy.__init__(self,
                                         [
-                                            (fts.c_cname_equal("Conv1d"),fts.a_replace(LoRAConv1d),self.lora_configs()),
-                                            (fts.c_cname_equal("Conv2d"),fts.a_replace(LoRAConv2d),self.lora_configs()),
-                                            (fts.c_cname_equal("Conv3d"),fts.a_replace(LoRAConv3d),self.lora_configs()),
+                                            (fts.c_cname_equal2("Conv1d"),fts.a_replace(LoRAConv1d),self.lora_configs()),
+                                            (fts.c_cname_equal2("Conv2d"),fts.a_replace(LoRAConv2d),self.lora_configs()),
+                                            (fts.c_cname_equal2("Conv3d"),fts.a_replace(LoRAConv3d),self.lora_configs()),
                                         ]
                                     )
 
