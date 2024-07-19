@@ -1,6 +1,9 @@
 import inspect
+from omegaconf import OmegaConf,DictConfig
+from typing import Union,Dict,Optional
+import importlib
 
-def get_arg_value(frame, target_class):
+def _get_arg_value(frame, target_class):
     """
     Recursively searches for the frame corresponding to the call of `target_class` and returns the corresponding arg_values.
 
@@ -19,8 +22,41 @@ def get_arg_value(frame, target_class):
             if local["__class__"] == type(target_class):
                 return arg_info
         if frame.f_back is not None:
-            return get_arg_value(frame.f_back, target_class)
+            return _get_arg_value(frame.f_back, target_class)
     return None
+
+def load_obj_from_config(path: Optional[str] = None, config_dict: Optional[Union[DictConfig, Dict]] = None):
+    """
+    Load an object from a YAML configuration file or dictionary.
+
+    Args:
+        path (str, optional): The path to the YAML configuration file. Only one of `path` and `config_dict` should be provided.
+        config_dict (DictConfig or dict, optional): The configuration dictionary. Only one of `path` and `config_dict` should be provided.
+
+    Returns:
+        object: The instantiated object based on the configuration.
+
+    Raises:
+        ValueError: If both `path` and `config_dict` are provided or if neither `path` nor `config_dict` are provided.
+        ValueError: If the `config_dict` does not contain the 'target' key.
+
+    """
+    if path is not None and config_dict is not None:
+        raise ValueError("Only one of path and config_dict should be provided.")
+    if path is None and config_dict is None:
+        raise ValueError("One of path and config_dict should be provided.")
+    if path is not None:
+        config_dict = OmegaConf.load(path)
+    if isinstance(config_dict, DictConfig):
+        config_dict = OmegaConf.to_container(config_dict)
+    if "target" not in config_dict.keys():
+        raise ValueError("The config_dict should at least contain 'target' key.")
+    module, cls = config_dict["target"].rsplit(".", 1)
+    if "params" not in config_dict.keys():
+        return getattr(importlib.import_module(module, package=None), cls)()
+    else:
+        paras = config_dict["params"]
+        return getattr(importlib.import_module(module, package=None), cls)(**paras)
 
 class InitParaRecorder():
     """
@@ -51,9 +87,7 @@ class InitParaRecorder():
     b=B(5,"b",3,4,5,addition=42)
     # >>> {'target': '__main__.B', 'parameters': {'a': 5, 'b': 'b', 'c': 3, 'addition': 42, 'args': (4, 5)}}
     ```
-
-    Methods:
-    - collect_init_paras: Collects the hyperparameters from the current frame.
+    
     """
 
     def __init__(self) -> None:
@@ -67,7 +101,9 @@ class InitParaRecorder():
         Returns:
         - init_paras: A dictionary containing the target and parameters.
         """
-        arg_info=get_arg_value(inspect.currentframe(),self)
+        if self.init_paras != {}:
+            return self.init_paras
+        arg_info=_get_arg_value(inspect.currentframe(),self)
         if arg_info is not None:
             keys=arg_info.args
             try:
@@ -85,8 +121,22 @@ class InitParaRecorder():
                     para_dict["args"]=arg_info.locals[arg_info.varargs]
             self.init_paras={
                 "target":".".join([self.__class__.__module__,self.__class__.__name__]),
-                "parameters":para_dict
+                "params":para_dict
             }
         else:
             print("Failed to find frame for current call of __init__")
         return self.init_paras
+    
+    def save_init_paras(self,path):
+        """
+        Saves the hyperparameters to a yaml file.
+
+        Args:
+        - path (str): The path to save the hyperparameters.
+        """
+        if self.init_paras == {}:
+            raise ValueError("Init parameters not collected. Please refer to the usage of `InitParaRecorder`.")
+        if "args" in self.init_paras["params"].keys():
+            raise ValueError("The `args` parameter is currently not supported in saving to yaml file as it is hard to reconstruct the original call.")
+        OmegaConf.save(OmegaConf.create(self.init_paras),path)
+
