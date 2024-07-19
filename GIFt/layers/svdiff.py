@@ -18,8 +18,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Union
 from ..utils.network_tool import conv_weight_hw
+from ..meta_types import FinetuableModule
 
-class SVDiffLayer(nn.Module):
+class SVDiffLayer(FinetuableModule):
     """
     Base class of SVDiff fine-tuning layer.
     
@@ -37,11 +38,11 @@ class SVDiffLayer(nn.Module):
     def __init__(self, weight: torch.Tensor):
         super().__init__()
         with torch.no_grad():
-            self.weight_u, self.weight_s, self.weight_vh = torch.linalg.svd(weight, full_matrices=False)
-        self.spectral_shift = nn.Parameter(torch.zeros_like(self.weight_s))
-        self.weight_u.requires_grad = False
-        self.weight_s.requires_grad = False
-        self.weight_vh.requires_grad = False
+            weight_u, weight_s, weight_vh = torch.linalg.svd(weight, full_matrices=False)
+        self.spectral_shift = nn.Parameter(weight_s.new_zeros(weight_s.shape))
+        self.register_buffer("weight_u",weight_u)
+        self.register_buffer("weight_s",weight_s)
+        self.register_buffer("weight_vh",weight_vh)
         self.spectral_activation = nn.ReLU()
     
     def svdiff_weight(self):
@@ -104,6 +105,7 @@ class SVDiffConv(SVDiffLayer):
     def __init__(self, parent_module: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d], train_bias=False):
         super().__init__(parent_module.weight.view(conv_weight_hw(parent_module)))
         self.parent_module = parent_module
+        self.parent_module.weight.requires_grad = False
         self.parent_module.bias.requires_grad = train_bias
     
     def forward(self, x):
