@@ -1,6 +1,6 @@
 from typing import Callable, Dict,Optional, Sequence, Tuple
 from . import FineTuningStrategy,merger_strategy
-from ..layers.lora import LoRALinear,LoRAConv1d,LoRAConv2d,LoRAConv3d
+from ..modules.lora import LoRALinear,LoRAConv1d,LoRAConv2d,LoRAConv3d
 from ..utils import factories as fts
 import torch.nn as nn
 

@@ -1,4 +1,4 @@
-from ..layers.svdiff import *
+from ..modules.svdiff import *
 from . import FineTuningStrategy, merger_strategy
 from ..utils import factories as fts
 
