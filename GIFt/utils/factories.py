@@ -59,7 +59,7 @@ def c_name_equal2_sequence(target_names:Sequence[str]):
 
 def c_name_in(target_name:str):
     """
-    Returns a check function that checks if the target_name is in the module name.
+    Returns a check function that checks if the module name is in the target name.
 
     Parameters:
         target_name (str): The name to compare against.
@@ -74,9 +74,43 @@ def c_name_in(target_name:str):
             return False
     return check_func
 
-def c_name_in_list(target_names:Sequence[str]):
+def c_name_in_sequence(target_names:Sequence[str]):
     """
-    Returns a check function that checks if the one of the target_names is in the module name.
+    Returns a check function that checks if the the module name is in the one of the target name.
+
+    Parameters:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        for target_name in target_names:
+            if current_name in target_name:
+                return True
+        return False
+    return check_func
+
+def c_name_contains(target_name:str):
+    """
+    Returns a check function that checks if the module name contains the target name.
+
+    Parameters:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        if target_name in current_name:
+            return True
+        else:
+            return False
+    return check_func
+
+def c_name_contains_sequence(target_names:Sequence[str]):
+    """
+    Returns a check function that checks if the the module name contains one of the target name.
 
     Parameters:
         target_name (str): The name to compare against.
@@ -127,7 +161,7 @@ def c_cname_equal2_sequence(target_classnames:Sequence[str]):
 
 def c_cname_in(target_classname:str):
     """
-    Returns a check function that checks if the target_name is in the module class name.
+    Returns a check function that checks if the module class name is in the target name.
 
     Parameters:
         target_name (str): The name to compare against.
@@ -142,9 +176,43 @@ def c_cname_in(target_classname:str):
                 return False
     return check_func
 
-def c_cname_in_list(target_classnames:Sequence[str]):
+def c_cname_in_sequence(target_classnames:Sequence[str]):
     """
-    Returns a check function that checks if the one of the target_names is in the module class name.
+    Returns a check function that checks if the module class name is in one of the target_names.
+
+    Parameters:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+        for target_classname in target_classnames:
+            if class_name in target_classname:
+                return True
+        return False
+    return check_func
+
+def c_cname_contains(target_classname:str):
+    """
+    Returns a check function that checks if the module class name contains the target name.
+
+    Parameters:
+        target_name (str): The name to compare against.
+
+    Returns:
+        check_func (function)
+    """
+    def check_func(parent_module:nn.Module,current_name:str, global_name:str, class_name:str, current_module:nn.Module):
+            if target_classname in class_name:
+                return True
+            else:
+                return False
+    return check_func
+
+def c_cname_in_sequence(target_classnames:Sequence[str]):
+    """
+    Returns a check function that checks if the module class name contains one of the target_names.
 
     Parameters:
         target_name (str): The name to compare against.
