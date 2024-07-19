@@ -162,7 +162,6 @@ class FineTuningStrategy():
         """
         self.constrain_type.extend(constrain_types)
 
-
 class DeBugStrategy(FineTuningStrategy):
     """
     A strategy for debugging purposes.
@@ -186,6 +185,11 @@ class FullFineTuningStrategy(FineTuningStrategy):
     
     def __init__(self, ) -> None:
         super().__init__([], [])
+
+class UnitStrategy(FineTuningStrategy):
+    
+    def __init__(self) -> None:
+        super().__init__()
 
 def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrategy:
     new_caps = []

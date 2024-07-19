@@ -1,5 +1,5 @@
 from typing import Callable, Dict,Optional, Sequence, Tuple
-from . import FineTuningStrategy
+from . import FineTuningStrategy,merger_strategy
 from ..layers.lora import LoRALinear,LoRAConv1d,LoRAConv2d,LoRAConv3d
 from ..utils import factories as fts
 import torch.nn as nn
@@ -52,3 +52,10 @@ class LoRAConvFineTuningStrategy(LoRAConfigMixin,FineTuningStrategy):
                                         ]
                                     )
 
+def LoRAAllFineTuningStrategy(
+    rank: int = 3, 
+    lora_alpha: float | None = None, 
+    lora_dropout: float = 0, 
+    train_bias: bool = False):
+    return merger_strategy([LoRALinearFineTuningStrategy(rank,lora_alpha,lora_dropout,train_bias),
+                           LoRAConvFineTuningStrategy(rank,lora_alpha,lora_dropout,train_bias)])
