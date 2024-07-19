@@ -1,11 +1,12 @@
 from typing import Any, Sequence,Tuple,Callable,Dict,Optional
 from warnings import warn
 from ..utils import default,get_class_name,take_intersection
-from ..utils import factories as fct
+from ..utils import default
+from ..utils.configs import InitParaRecorder,load_obj_from_config
 import torch.nn as nn
 from typing import Type,Union,Optional,Dict
 
-class FineTuningStrategy():
+class FineTuningStrategy(InitParaRecorder):
     """
     A class representing a fine-tuning strategy.
 
@@ -192,6 +193,16 @@ class UnitStrategy(FineTuningStrategy):
         super().__init__()
 
 def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrategy:
+    """
+    Merges multiple FineTuningStrategy objects into a single FineTuningStrategy object.
+
+    Args:
+        strategies (Sequence[FineTuningStrategy]): A sequence of FineTuningStrategy objects.
+
+    Returns:
+        FineTuningStrategy: The merged FineTuningStrategy object.
+
+    """
     new_caps = []
     constrains=[]
     for strategy in strategies:
@@ -205,3 +216,17 @@ def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrat
         new_constrains=take_intersection(new_constrains)
             
     return FineTuningStrategy(new_caps, new_constrains)
+
+def load_strategy_from_config(path: Optional[str] = None, config_dict: Optional[Dict] = None) -> FineTuningStrategy:
+    """
+    Load a fine-tuning strategy from a configuration file or dictionary.
+
+    Args:
+        path (Optional[str]): The path to the yaml configuration file. If provided, the configuration will be loaded from the file.
+        config_dict (Optional[Dict]): The configuration dictionary. If provided, the configuration will be loaded from the dictionary.
+
+    Returns:
+        FineTuningStrategy: The loaded fine-tuning strategy.
+
+    """
+    return load_obj_from_config(path, config_dict)
