@@ -75,7 +75,8 @@ class SVDiffLinear(SVDiffLayer):
     def __init__(self, parent_module: nn.Linear, train_bias=False):
         super().__init__(parent_module.weight)
         if hasattr(self.parent_module, 'bias'):
-            self.bias = nn.Parameter(parent_module.bias, requires_grad=train_bias)
+            if self.parent_module.bias is not None:
+                self.bias = nn.Parameter(parent_module.bias, requires_grad=train_bias)
 
     def forward(self, x):
         """
@@ -108,7 +109,8 @@ class SVDiffConv(SVDiffLayer):
         self.parent_module = parent_module
         self.parent_module.weight.requires_grad = False
         if hasattr(self.parent_module, 'bias'):
-            self.parent_module.bias.requires_grad = train_bias
+            if self.parent_module.bias is not None:
+                self.parent_module.bias.requires_grad = train_bias
     
     def forward(self, x):
         """
