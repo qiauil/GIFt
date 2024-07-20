@@ -27,8 +27,9 @@ import os
 from typing import Union,Optional
 from warnings import warn
 from ..utils import default
-from ..utils.network_tool import conv_weight_hw
-from ..meta_types import FinetuableModule
+from ..utils.network_tool import conv_weight_hw,freeze_module
+from ..meta_types import FinetuableModule,FinetuningType
+
 
 class LoRALayer(FinetuableModule):
     """
@@ -140,9 +141,10 @@ class LoRALinearLike(LoRALayer):
             self.shape_transfer = lambda ori_tensor: ori_tensor.view(self.parent_module.weight.shape)
         else:
             self.shape_transfer = lambda ori_tensor: ori_tensor
-        if hasattr(self.parent_module, 'bias'):
-            if self.parent_module.bias is not None:
-                self.parent_module.bias.requires_grad = train_bias
+        freeze_module(self.parent_module, 
+                      weights_type=FinetuningType.FINE_TUNE,
+                      bias_type=FinetuningType.TRAIN if train_bias else FinetuningType.FREEZE
+                      )
 
     '''
     We notice that in PyTorch Lighning, the train loop will actually not call the train() function of the module to enable 

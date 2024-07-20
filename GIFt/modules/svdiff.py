@@ -17,8 +17,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Union
-from ..utils.network_tool import conv_weight_hw
-from ..meta_types import FinetuableModule
+from ..utils.network_tool import conv_weight_hw,freeze_module
+from ..meta_types import FinetuableModule,FinetuningType
 
 class SVDiffLayer(FinetuableModule):
     """
@@ -107,10 +107,10 @@ class SVDiffConv(SVDiffLayer):
     def __init__(self, parent_module: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d], train_bias=False):
         super().__init__(parent_module.weight.view(conv_weight_hw(parent_module)))
         self.parent_module = parent_module
-        self.parent_module.weight.requires_grad = False
-        if hasattr(self.parent_module, 'bias'):
-            if self.parent_module.bias is not None:
-                self.parent_module.bias.requires_grad = train_bias
+        freeze_module(self.parent_module, 
+                      weights_type=FinetuningType.FINE_TUNE,
+                      bias_type=FinetuningType.TRAIN if train_bias else FinetuningType.FREEZE
+                      )
     
     def forward(self, x):
         """
