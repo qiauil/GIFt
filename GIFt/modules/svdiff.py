@@ -77,6 +77,8 @@ class SVDiffLinear(SVDiffLayer):
         if hasattr(parent_module, 'bias'):
             if parent_module.bias is not None:
                 self.bias = nn.Parameter(parent_module.bias, requires_grad=train_bias)
+            else:
+                self.bias = None
 
     def forward(self, x):
         """
