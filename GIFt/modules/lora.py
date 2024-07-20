@@ -126,7 +126,7 @@ class LoRALinearLike(LoRALayer):
                                                                                                    rank,
                                                                                                    w_weight,rank*(h_weight+w_weight)
                                                                                                    )
-            raise warn(msg)
+            warn(msg)
         self.parent_module = parent_module
         # Actual trainable parameters
         self.lora_B = nn.Parameter(self.parent_module.weight.new_zeros((h_weight, rank)))
