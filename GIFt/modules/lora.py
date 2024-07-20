@@ -140,7 +140,8 @@ class LoRALinearLike(LoRALayer):
             self.shape_transfer = lambda ori_tensor: ori_tensor.view(self.parent_module.weight.shape)
         else:
             self.shape_transfer = lambda ori_tensor: ori_tensor
-        self.parent_module.bias.requires_grad = train_bias
+        if hasattr(self.parent_module, 'bias'):
+            self.parent_module.bias.requires_grad = train_bias
 
     '''
     We notice that in PyTorch Lighning, the train loop will actually not call the train() function of the module to enable 
