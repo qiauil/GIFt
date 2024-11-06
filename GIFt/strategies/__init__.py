@@ -6,68 +6,12 @@ from ..utils.configs import InitParaRecorder,load_obj_from_config
 import torch.nn as nn
 from typing import Type,Union,Optional,Dict
 
-class FineTuningStrategy(InitParaRecorder):
-    """
-    A class representing a fine-tuning strategy.
 
-    Args:
-        checks_actions_parnames (Sequence[Tuple[Callable, Callable, dict]], optional): 
-            A list of tuples containing the check function, action function, and action parameters.
-            Defaults to an empty list.
-        constrain_type (Optional[Union[Sequence[Type], Type]], optional): 
-            A list of types or a single type that the strategy is constrained to.
-            Defaults to an empty list.
-
-    Attributes:
-        caps (list): A list of tuples containing the check function, action function, and action parameters.
-        constrain_type (list): A list of types that the strategy is constrained to.
-
-    """
-
+class _CAPBase():
+    
     def __init__(self,
-                 checks_actions_parnames: Sequence[Tuple[Callable, Callable, dict]] = [],
-                 constrain_type: Optional[Union[Sequence[Type], Type]] = []) -> None:
-        self.caps = checks_actions_parnames  
-        self.constrain_type = constrain_type
-        if not isinstance(self.constrain_type, Sequence):
-            self.constrain_type = [self.constrain_type]
-        
-    def __call__(self,
-                 parent_module: nn.Module, 
-                 current_name: str, 
-                 global_name: str, 
-                 class_name: str, 
-                 current_module: nn.Module) -> Any:
-        """
-        Executes the fine-tuning strategy.
-
-        Args:
-            parent_module (nn.Module): The parent module.
-            current_name (str): The current name.
-            global_name (str): The global name.
-            class_name (str): The class name.
-            current_module (nn.Module): The current module.
-
-        Returns:
-            Any: True if the strategy is applicable, False otherwise.
-
-        """
-        if len(self.caps) == 0:
-            # if no cap is provided, then the strategy is not applicable.
-            # i.e. full fine-tuning
-            return True
-        for cap in self.caps:
-            check_func, act_func, act_para = self._extract_cap(cap)
-            if check_func(parent_module, current_name, global_name, class_name, current_module):
-                if isinstance(act_func, FineTuningStrategy):
-                    if act_para is not {}:
-                        warn(f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function.")
-                    if act_func(parent_module, current_name, global_name, class_name, current_module):
-                        return True
-                else:
-                    act_func(parent_module, current_name, global_name, class_name, current_module, **act_para)
-                    return True
-        return False
+                 checks_actions_paras: Sequence[Tuple[Callable, Callable, dict]] = [],) -> None:
+        self.caps = checks_actions_paras  
 
     def checks(self):
         """
@@ -142,55 +86,159 @@ class FineTuningStrategy(InitParaRecorder):
         """
         for cap in caps:
             self.register_cap(*cap)
+
+    def __len__(self):
+        return len(self.caps)
     
-    def regisier_constarin_type(self, constrain_type: Type):
-        """
-        Registers a new constrain type.
+    def __getitem__(self, index):
+        return self.caps[index]
 
-        Args:
-            constrain_type (Type): The constrain type to register.
-
-        """
-        self.constrain_type.append(constrain_type)
-    
-    def regisier_constarin_types(self, constrain_types: Sequence[Type]):
-        """
-        Registers multiple constrain types.
-
-        Args:
-            constrain_types (Sequence[Type]): The constrain types to register.
-
-        """
-        self.constrain_type.extend(constrain_types)
-
-class DeBugStrategy(FineTuningStrategy):
+class FineTuningStrategy(InitParaRecorder):
     """
-    A strategy for debugging purposes.
+    A class representing a fine-tuning strategy.
+
+    Args:
+        module_caps (Optional[Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]], optional):
+            A list of tuples containing the check function, action function, and action parameters for modules.
+            Defaults to an empty list.
+        para_caps (Optional[Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]], optional):
+            A list of tuples containing the check function, action function, and action parameters for parameters.
+            Defaults to an empty list.
+        constraint_type (Optional[Union[Sequence[Type], Type]], optional): 
+            A list of types or a single type. In `enable_fine_tuning`, the module type will be checked against this list.
+            The strategy will only be applied to modules of the specified type(s).
+
+    Attributes:
+        caps (list): A list of tuples containing the check function, action function, and action parameters.
+        constraint_type (list): A list of types that the strategy is constrainted to.
+
+    """
+
+    def __init__(self,
+                 module_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]] = [],
+                 para_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]] = [],
+                 constraint_type: Optional[Union[Sequence[Type], Type]] = []) -> None:
+        self.constraint_type = constraint_type
+        if not isinstance(self.constraint_type, Sequence):
+            self.constraint_type = [self.constraint_type]
+        self.moule_caps = _CAPBase(module_caps)
+        self.para_caps = _CAPBase(para_caps)
+        
+    def __call__(self,
+                 parent_module: Optional[nn.Module], 
+                 current_name: str, 
+                 global_name: str, 
+                 class_name: str, 
+                 current_module: nn.Module) -> Any:
+        """
+        Executes the fine-tuning strategy.
+
+        Args:
+            parent_module (nn.Module): The parent module.
+            current_name (str): The current name.
+            global_name (str): The global name.
+            class_name (str): The class name.
+            current_module (nn.Module): The current module.
+
+        Returns:
+            Any: True if the strategy is applicable, False otherwise.
+
+        """
+        self.check_module(parent_module, current_name, global_name, class_name, current_module)
+        self.check_para(parent_module, current_name, global_name, class_name, current_module)
+    
+    def check_module(self,
+                     parent_module: Optional[nn.Module], 
+                 current_name: str, 
+                 global_name: str, 
+                 class_name: str, 
+                 current_module: nn.Module):
+        for cap in self.moule_caps:
+            check_func, act_func, act_para = self.moule_caps._extract_cap(cap)
+            if check_func(parent_module, current_name, global_name, class_name, current_module):
+                if isinstance(act_func, FineTuningStrategy):
+                    assert act_para == {}, f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function."
+                    act_func.check_module(parent_module, current_name, global_name, class_name, current_module)
+                else:
+                    act_func(parent_module, current_name, global_name, class_name, current_module,**act_para)    
+    
+    def check_para(self,
+                   parent_module: Optional[nn.Module], 
+                current_name: str, 
+                 global_name: str, 
+                 class_name: str, 
+                 current_module: nn.Module):
+        if len(self.para_caps) == 0:
+            for name, para in current_module.named_parameters():
+                para.requires_grad=False
+        else:
+            for cap in self.para_caps:
+                check_func, act_func, act_para = self.para_caps._extract_cap(cap)
+                for name, para in current_module.named_parameters():
+                    if check_func(parent_module, current_name, global_name, class_name, current_module, name, para):
+                        if isinstance(act_func, FineTuningStrategy):
+                            assert act_para == {}, f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function."
+                            act_func.check_para(parent_module, current_name, global_name, class_name, current_module)
+                        else:
+                            act_func(parent_module, current_name, global_name, class_name, current_module, name, para, **act_para)
+                    else:
+                        para.requires_grad=False
+
+    def regisier_constraint_type(self, constraint_type: Type):
+        """
+        Registers a new constraint type.
+
+        Args:
+            constraint_type (Type): The constraint type to register.
+
+        """
+        self.constraint_type.append(constraint_type)
+    
+    def regisier_constraint_types(self, constraint_types: Sequence[Type]):
+        """
+        Registers multiple constraint types.
+
+        Args:
+            constraint_types (Sequence[Type]): The constraint types to register.
+
+        """
+        self.constraint_type.extend(constraint_types)
+
+
+def DeBugStrategy(strategy:FineTuningStrategy) -> FineTuningStrategy:
+    """
+    A strategy for debugging purposes. 
+    This function will return a new strategy that prints the information of the current modules/paras when the check functions return true.
     
     Args:
-        check_funcs: Sequence[Callable]: 
-            A list of check functions. If the check_func returns true, it will print the information of current layers.
-    """
+        strategy (FineTuningStrategy): The strategy to debug.
 
-    def __init__(self, check_funcs: Sequence[Callable]) -> None:
-        super().__init__()
-        for i, check_func in enumerate(check_funcs):
-            self.register_cap(
-                check_func,
-                lambda parent_module, current_name, global_name, class_name, current_module: print(
-                    f"check_func {i} is true. the target info are {current_name}, {global_name}, {class_name}"
-                ),
-            )
+    Returns:
+        FineTuningStrategy: The debugged strategy.
+
+    """
+    module_checks=strategy.moule_caps.checks()
+    para_checks=strategy.para_caps.checks()
+    return FineTuningStrategy(
+        module_caps=[(
+                    module_checks[i],
+                    lambda parent_module, current_name, global_name, class_name, current_module: 
+                        print(f"module check_func {i} is true. the target info are {current_name}, {global_name}, {class_name}"),
+                    {}
+                    ) for i in range(len(module_checks))],
+        para_caps=[(
+                    para_checks[i],
+                    lambda parent_module, current_name, global_name, class_name, current_module, name, para: 
+                        print(f"para check_func {i} is true. the target info are {current_name}, {global_name}, {class_name}, {name}"),
+                    {}
+                    ) for i in range(len(para_checks))],
+        constraint_type=strategy.constraint_type
+    )
             
 class FullFineTuningStrategy(FineTuningStrategy):
     
     def __init__(self, ) -> None:
-        super().__init__([], [])
-
-class UnitStrategy(FineTuningStrategy):
-    
-    def __init__(self) -> None:
-        super().__init__()
+        super().__init__([],[],[])
 
 def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrategy:
     """
@@ -203,19 +251,21 @@ def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrat
         FineTuningStrategy: The merged FineTuningStrategy object.
 
     """
-    new_caps = []
-    constrains=[]
+    new_module_caps=[]
+    new_para_caps=[]
+    constraints=[]
     for strategy in strategies:
-        new_caps.extend(strategy.caps)
-        constrains.append(strategy.constrain_type)
-    new_constrains=[]
-    for constrain in constrains:
-        if len(constrain)>0:
-            new_constrains.append(constrain)
-    if len(new_constrains)>0:
-        new_constrains=take_intersection(new_constrains)
+        new_module_caps.extend(strategy.moule_caps.caps)
+        new_para_caps.extend(strategy.para_caps.caps)
+        constraints.append(strategy.constraint_type)
+    new_constraints=[]
+    for constraint in constraints:
+        if len(constraint)>0:
+            new_constraints.append(constraint)
+    if len(new_constraints)>0:
+        new_constraints=take_intersection(new_constraints)
             
-    return FineTuningStrategy(new_caps, new_constrains)
+    return FineTuningStrategy(new_module_caps,new_para_caps, new_constraints)
 
 def load_strategy_from_config(path: Optional[str] = None, config_dict: Optional[Dict] = None) -> FineTuningStrategy:
     """

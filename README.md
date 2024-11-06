@@ -1,452 +1,220 @@
 # GIFt: Generic and Intuitive Fine-tuning Library
-# NOTE: EXPIRED  
 
-## Examples of using GIFt for fine-tuning:
+Fine-tuning is a common technique in deep learning to adapt a pre-trained model to a new task. It is widely used in computer vision, natural language processing, and other domains. However, fine-tuning is not always straightforward. It requires a good understanding of the model, the dataset, and the task. In this notebook, we introduce GIFt, a generic and intuitive fine-tuning library that simplifies the process of fine-tuning pre-trained models. GIFt is designed to be easy to use, flexible, and extensible. 
 
-First, Let's build a neural network
+## Quick Start
+
+### Structure of a neural network and Caps
+A modern neural network usually consists of many layers. In each layer, there are two main components: a submodule which links to the next layer (or not) and some independent parameters (at the last layer, there will only be parameters).
+
+```
+Network
+- module1
+    - submodule1
+        - parameters
+        - subsubmodule1
+            - ***
+                ***
+                -lastsubmodule
+                    - parameter
+    - submodule2
+        - parameters
+- parameters
+```
+
+The core of fine-tuning a network is to modify part of the submodule and parameters and freeze the rest with the pre-trained result. To enable this, we introduce the concept of `Caps`, i.e., "check-action-parameters". A `Caps` is a sequence of tuple where each tuple contains three elements: a check function, an action function, and a parameter. The check function is used to determine whether the submodule or parameter should be modified. The action function is used to modify the submodule or parameter. The parameter is the value that will be used in the action function. With a designed `Caps`, we can easily fine-tune a network.
+
+The allowed check function in `GIFt` should have the following structure:
+
+for submodule:
+```
+check_func (function):
+    A function that takes in the following parameters and returns True if the module meets the condition, False otherwise.
+    
+    - parent_module (nn.Module): The parent module.
+    - current_name (str): The name of current module.
+    - global_name (str): The global name of current modul.
+    - class_name (str): The class name of current module.
+    - current_module (nn.Module): The current module object.
+
+    Returns:
+        bool: True if the module meets the condition, False otherwise.
+```
+
+for parameter:
+```
+check_func: 
+    - A function that takes in the following parameters and returns True if the parameter meets the condition, False otherwise.
+    
+    - parent_module (nn.Module): The parent module.
+    - current_name (str): The name of current module.
+    - global_name (str): The global name of current modul.
+    - class_name (str): The class name of current module.
+    - current_module (nn.Module): The current module object.
+    - parameter_name (str): The name of current parameter.
+    - parameter (nn.Parameter): The current parameter object. 
+    
+    Returns:
+        bool: True if the parameter meets the condition, False otherwise.
+```
+
+The corresponding action function receives the same parameters as the check function and modifies the submodule or parameter. You can also set additional parameters to the action function with the `parameter` in caps tuple.
+
+All the above parameters can be get through the `ModuleIterator` class in `GIFt`. Here is an simple example
+:
 
 
 ```python
-import torch
 import torch.nn as nn
+import torch
+from GIFt import ModuleIterator
+
+class TestNet(nn.Module):
+    
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.nn_seq = nn.Sequential(
+            nn.Linear(120, 84),
+            nn.ReLU(),
+            nn.Linear(84, 10)
+        )
+
+net=TestNet()
+iterator=ModuleIterator(net,"TestNet")
+for current_name, global_name, class_name, current_module, has_children in iterator:
+    print(current_name, global_name, class_name, has_children)
+    for para_name, param in current_module.named_parameters(recurse=False):
+        print(">", global_name, para_name)
+```
+
+    conv1 TestNet.conv1 Conv2d False
+    > TestNet.conv1 weight
+    > TestNet.conv1 bias
+    pool TestNet.pool MaxPool2d False
+    fc1 TestNet.fc1 Linear False
+    > TestNet.fc1 weight
+    > TestNet.fc1 bias
+    nn_seq TestNet.nn_seq Sequential True
+
+
+In `GIFt.factories` module, we provide some common check functions and action functions. You can also define your own check functions and action functions. 
+
+### Finetuning strategy
+
+In `GIFt`, we use a `FineTuningStrategy` class to orgainze the `Caps`:
+
+
+```python
+class FineTuningStrategy(InitParaRecorder):
+    """
+    A class representing a fine-tuning strategy.
+
+    Args:
+        module_caps (Optional[Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]], optional):
+            A list of tuples containing the check function, action function, and action parameters for modules.
+            Defaults to an empty list.
+        para_caps (Optional[Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]], optional):
+            A list of tuples containing the check function, action function, and action parameters for parameters.
+            Defaults to an empty list.
+        constraint_type (Optional[Union[Sequence[Type], Type]], optional): 
+            A list of types or a single type. In `enable_fine_tuning`, the module type will be checked against this list.
+            The strategy will only be applied to modules of the specified type(s).
+    """
+```
+
+`FineTuningStrategy` collects all the `Caps` and can be applied to a network. You may notice that there is an additional initialization parameter `constraint_type` in the class. You can set a specific type to this `constraint_type` to make sure this strategy only works on the specific type of module. Note that this type check is not working inside of `FineTuningStrategy` but in the `enable_fine_tuning` function.
+
+
+```python
+def enable_fine_tuning(module:nn.Module,
+                      fine_tuning_strategy:FineTuningStrategy,
+                      replace_parameter_function:bool=True):
+    """
+    Enable fine-tuning for a given module.
+
+    Args:
+        module (nn.Module): The module to enable fine-tuning for.
+        fine_tuning_strategy (FineTuningStrategy): The strategy to use for fine-tuning.
+        replace_parameter_function (bool): Whether to replace the `parameters` function of the module.
+            If True, the `parameters` function will only return trainable parameters. This helps you 
+            avoiding you modifying your optimizer initialization code. If you set it as False, you 
+            can use the `trainable_parameters` function from `GIFt.utils.network_tool` to get trainable parameters of 
+            your network for an optimizer.
+
+    Returns:
+        None
+    """
+```
+
+`enable_fine_tuning` function is the main function to apply the `FineTuningStrategy` to a network. It will iterate through all the modules and parameters in the network and apply the `Caps` to the network. It will also replace the state_dict of the network to make sure that everytime you save or load the model, you will only save or load the fine-tuned part.
+
+Currently, we provide some bilit-in `FineTuningStrategy` in `GIFt.strategies` module. You can also define your own `FineTuningStrategy` by inheriting the `FineTuningStrategy` class. Here is a very simple example to enable fine-tuning on all the `nn.Linear` modules with LoRA:
+
+
+```python
+from torchvision.models.resnet import resnet18
 from GIFt import enable_fine_tuning
-from GIFt.strategies import LoRAFullFineTuningStrategy
-from GIFt.utils import num_trainable_parameters
+from GIFt.strategies.lora import LoRAAllFineTuningStrategy
+from GIFt.utils.info import collect_trainable_parameters,table_info
 
-class MLP(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim,num_layers):
-        super(MLP, self).__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.num_layers = num_layers
-        self.layers = nn.ModuleList()
-        self.layers.append(nn.Linear(input_dim, hidden_dim))
-        for i in range(num_layers-1):
-            self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-        self.layers.append(nn.Linear(hidden_dim, output_dim))
-        self.relu = nn.ReLU()
-    
-    def forward(self, x):
-        for i in range(self.num_layers):
-            x = self.layers[i](x)
-            x = self.relu(x)
-        x = self.layers[-1](x)
-        return x
-
-mlp=MLP(1, 100, 1, 5)
-print(mlp)
-print("Network before enable fine-tuning:",mlp)
-print("Number of trainable parameters:",num_trainable_parameters(mlp))
+net=resnet18()
+paras_info,num_paras=collect_trainable_parameters(net)
+print("Before fine-tuning, the number of trainable parameters is:",num_paras)
+enable_fine_tuning(net,LoRAAllFineTuningStrategy())
+paras_info,num_paras=collect_trainable_parameters(net)
+print("After fine-tuning, the number of trainable parameters is:",num_paras)
+print(table_info(paras_info,header=["index","Name","Type","Shape"]))
 ```
 
-    MLP(
-      (layers): ModuleList(
-        (0): Linear(in_features=1, out_features=100, bias=True)
-        (1-4): 4 x Linear(in_features=100, out_features=100, bias=True)
-        (5): Linear(in_features=100, out_features=1, bias=True)
-      )
-      (relu): ReLU()
-    )
-    Network before enable fine-tuning: MLP(
-      (layers): ModuleList(
-        (0): Linear(in_features=1, out_features=100, bias=True)
-        (1-4): 4 x Linear(in_features=100, out_features=100, bias=True)
-        (5): Linear(in_features=100, out_features=1, bias=True)
-      )
-      (relu): ReLU()
-    )
-    Number of trainable parameters: 40701
-
-
-We can enable fine-tuning for this neural network with a single line of command:
-
-
-```python
-enable_fine_tuning(mlp, LoRAFullFineTuningStrategy())
-print("Network after enable fine-tuning:",mlp)
-print("Number of trainable parameters after fine-tuning:",num_trainable_parameters(mlp))
-```
-
-    Network after enable fine-tuning: MLP(
-      (layers): ModuleList(
-        (0): LoRALinear(
-          (parent_module): Linear(in_features=1, out_features=100, bias=True)
-        )
-        (1-4): 4 x LoRALinear(
-          (parent_module): Linear(in_features=100, out_features=100, bias=True)
-        )
-        (5): LoRALinear(
-          (parent_module): Linear(in_features=100, out_features=1, bias=True)
-        )
-      )
-      (relu): ReLU()
-    )
-    Number of trainable parameters after fine-tuning: 3006
-
-
-Here, `LoRAFullFineTuningStrategy` is a subclass of `FineTuningStrategy` where it can replace all Linear layers with LoRA Linear layers and all Conv1/2/3D layers with LoRAConv1/2/3D layers. We will discuss how to build up a new fine-tuning strategy later.
-
-After fine-tuning with the `enable_fine_tuning` function, the `parameters()` of the network instance will be replaced with a new function where only trainable parameters are returned:
-
-
-```python
-optimizer = torch.optim.Adam(mlp.parameters(), lr=0.001)
-```
-
-You can also use `GIFt.utils.trainable_parameters(mlp)` to get the trainable parameters.
-
-Besides, after enabling fine-tuning for the neural network, the statedict of the model will be updated to only include the trainable parameters (fine-tuned parameters). Thus, we can directly save and load the weights of the fine-tuned network as the conventional way we usually do in PyTorch.
-
-
-```python
-state_dict = mlp.state_dict()
-print(state_dict.keys())
-torch.save(state_dict, "mlp.pt")
-mlp.load_state_dict(torch.load("mlp.pt"))
-```
-
-    dict_keys(['layers.0.lora_B', 'layers.0.lora_A', 'layers.1.lora_B', 'layers.1.lora_A', 'layers.2.lora_B', 'layers.2.lora_A', 'layers.3.lora_B', 'layers.3.lora_A', 'layers.4.lora_B', 'layers.4.lora_A', 'layers.5.lora_B', 'layers.5.lora_A'])
-
-
-
-
-
-    <All keys matched successfully>
-
-
-
-## Training strategy
-
-`enable_fine_tuning` function requires an instance of `FineTuningStrategy` class. Actually, any iterable object returns a `check` function, and an `action` function works for the `enable_fine_tuning` function. Here, the `check` function checks whether the layer satisfies some specific condition, and the `action` function will be activated if the `check` function returns true.
-
-The parameters of the `check` and `action` functions are `parent_module, name, global_name, class_name, current_module` respectively. Let's use a simple example to show how you a fine-tuning strategy and the meaning of these parameters:
-
-
-```python
-class ExampleMLP(nn.Module):
-    def __init__(self):
-        super(ExampleMLP, self).__init__()
-        self.in_model=nn.Linear(1, 10)
-        self.mid_model=MLP(10, 10, 10, 2)
-        self.out_model=nn.Linear(10, 1)
-    
-    def forward(self, x):
-        return self.mlp(x)
-
-example_mlp=ExampleMLP()
-print("Example MLP:",example_mlp)
-```
-
-    Example MLP: ExampleMLP(
-      (in_model): Linear(in_features=1, out_features=10, bias=True)
-      (mid_model): MLP(
-        (layers): ModuleList(
-          (0-2): 3 x Linear(in_features=10, out_features=10, bias=True)
-        )
-        (relu): ReLU()
-      )
-      (out_model): Linear(in_features=10, out_features=1, bias=True)
-    )
-
-
-The following strategy will replace all the linear layer with convolution layer:
-
-
-```python
-class ExampleStrategy():
-    def __init__(self):
-        
-        def check_function(parent_module,name, global_name, class_name, current_module):
-            if class_name == "Linear":
-                return True
-            return False
-        
-        def action_function(parent_module,name, global_name, class_name, current_module):
-            print("Parent Module",parent_module)
-            print("Layer name:",name)
-            print("Global name:",global_name)
-            print("Class name:",class_name)
-            print("Layer object:",current_module)
-            print("_"*50)
-            setattr(parent_module, name, nn.Conv2d(
-                current_module.in_features, current_module.out_features,
-                kernel_size=3
-            ))
-        self.check_actions=[(check_function, action_function)]
-        
-    def __len__(self):
-        return len(self.check_actions)
-    
-    def __getitem__(self, index):
-        return self.check_actions[index]
-    
-enable_fine_tuning(example_mlp, ExampleStrategy())
-```
-
-    Parent Module ExampleMLP(
-      (in_model): Linear(in_features=1, out_features=10, bias=True)
-      (mid_model): MLP(
-        (layers): ModuleList(
-          (0-2): 3 x Linear(in_features=10, out_features=10, bias=True)
-        )
-        (relu): ReLU()
-      )
-      (out_model): Linear(in_features=10, out_features=1, bias=True)
-    )
-    Layer name: in_model
-    Global name: in_model
-    Class name: Linear
-    Layer object: Linear(in_features=1, out_features=10, bias=True)
-    __________________________________________________
-    Parent Module ModuleList(
-      (0-2): 3 x Linear(in_features=10, out_features=10, bias=True)
-    )
-    Layer name: 0
-    Global name: mid_model.layers.0
-    Class name: Linear
-    Layer object: Linear(in_features=10, out_features=10, bias=True)
-    __________________________________________________
-    Parent Module ModuleList(
-      (0): Conv2d(10, 10, kernel_size=(3, 3), stride=(1, 1))
-      (1-2): 2 x Linear(in_features=10, out_features=10, bias=True)
-    )
-    Layer name: 1
-    Global name: mid_model.layers.1
-    Class name: Linear
-    Layer object: Linear(in_features=10, out_features=10, bias=True)
-    __________________________________________________
-    Parent Module ModuleList(
-      (0-1): 2 x Conv2d(10, 10, kernel_size=(3, 3), stride=(1, 1))
-      (2): Linear(in_features=10, out_features=10, bias=True)
-    )
-    Layer name: 2
-    Global name: mid_model.layers.2
-    Class name: Linear
-    Layer object: Linear(in_features=10, out_features=10, bias=True)
-    __________________________________________________
-    Parent Module ExampleMLP(
-      (in_model): Conv2d(1, 10, kernel_size=(3, 3), stride=(1, 1))
-      (mid_model): MLP(
-        (layers): ModuleList(
-          (0-2): 3 x Conv2d(10, 10, kernel_size=(3, 3), stride=(1, 1))
-        )
-        (relu): ReLU()
-      )
-      (out_model): Linear(in_features=10, out_features=1, bias=True)
-    )
-    Layer name: out_model
-    Global name: out_model
-    Class name: Linear
-    Layer object: Linear(in_features=10, out_features=1, bias=True)
-    __________________________________________________
-
-
-Form the previous example, we can know that:
-* `enable_fine_tuning` function iterates over all layers from top to bottom, from outside to inside.
-* `parent_module` parameter is a `nn.Module` representing the parent module of current layer.
-* `layer_name` parameter is a `str` representing the name of current layer.
-* `global_name` parameter is a `str` representing the global name of current layer, i.e., it contains all the name of parent layers.
-* `current_module` is a `nn.Module` representing the current layer.
-
-`FineTuningStrategy` class is a helper class which makes your procedure of designing the training strategy more simpler. It also support additional parameters for the action `function`. You can refer to the source code of `LoRAFullFineTuningStrategy()` to see how it works. Here we give an example of using `FineTuningStrategy` class to build up the previous strategy: 
-
-
-```python
-from typing import Callable, Dict, Sequence, Tuple
-from GIFt.strategies import FineTuningStrategy
-import GIFt.utils.factories as fts
-
-class ExampleStrategy2(FineTuningStrategy):
-    
-    def __init__(self, kernel_size=3) -> None:
-        action_paras = {"conv_para":{"kernel_size": 3}}
-        customized_action_paras = {"conv_para":{"kernel_size": kernel_size}}
-        checks_actions_parnames = [
-            (fts.c_cname_equal("Linear"),
-             fts.a_replace(lambda current_module,kernel_size: nn.Conv2d(current_module.in_features, current_module.out_features, kernel_size=kernel_size)),
-             "conv_para")
-        ]
-        super().__init__(checks_actions_parnames, action_paras, customized_action_paras)
-
-example_mlp=ExampleMLP()
-enable_fine_tuning(example_mlp, ExampleStrategy2())
-print(example_mlp)
-```
-
-    ExampleMLP(
-      (in_model): Conv2d(1, 10, kernel_size=(3, 3), stride=(1, 1))
-      (mid_model): MLP(
-        (layers): ModuleList(
-          (0-2): 3 x Conv2d(10, 10, kernel_size=(3, 3), stride=(1, 1))
-        )
-        (relu): ReLU()
-      )
-      (out_model): Conv2d(10, 1, kernel_size=(3, 3), stride=(1, 1))
-    )
-
-
-A good thing of using `FineTuningStrategy` is that we can extract the parameters of fine-tuning and save them separately:
-
-
-```python
-print(ExampleStrategy2().paras())
-print(LoRAFullFineTuningStrategy().paras())
-```
-
-    {'conv_para': {'kernel_size': 3}}
-    {'lora_paras': {'rank': 3, 'lora_alpha': None, 'lora_dropout': 0.0, 'train_bias': False}}
-
-
-The last thing we need to mention is that we recommend making all the new layers in the fine-tuning model an instance of `GIFt.meta_types.FinetuableModule` as the `enable_fine_tuning` function will check whether a layer is already an instance of the `FinetuableModule` to avoid incorrectly duplicate setting networks.
-
-## An example of applying LoRA fine-tuning to attention layers
-
-The `Q`, `K`, and `V` matrix in attention layer can be calculated through `Linear` layer if the input is a sequence or `Conv` layer is the input is a field. Thus, we can simply use our previous code to enable LoRA fine-tuning for attention layers:
-
-Build up attention layer:
-
-
-```python
-import math
-from einops import rearrange
-
-# more examples of attention implementation can be found in my another repository:
-# https://github.com/qiauil/Foxutils/blob/main/foxutils/network/attentions.py
-class MultiHeadAttentionBase(nn.Module):
-    
-    def __init__(self, num_heads:int,linear_attention=False, dropout=0.0):
-        super().__init__()
-        self.num_heads = num_heads
-
-    def forward(self, queries, keys, values):
-        queries,keys,values =map(self.apart_input,(queries,keys,values))
-        d_k = keys.shape[-1]
-        weights = torch.bmm(queries, keys.transpose(1,2)) / math.sqrt(d_k)
-        weights = nn.functional.softmax(weights, dim=-1)
-        return self.concat_output(torch.bmm(self.dropout(weights), values))
-
-    def apart_input(self,x):
-        #(batch_size, num_elements, num_heads$\times$dim_deads)  >>> (batch_size, num_elements, num_heads, dim_deads)
-        x = x.reshape(x.shape[0], x.shape[1], self.num_heads, -1)
-        #(batch_size, num_elements, num_heads, dim_deads) >>> (batch_size, num_heads, num_elements, dim_deads) 
-        x = x.permute(0, 2, 1, 3)
-        #(batch_size, num_heads, num_elements, dim_deads)  >>> (batch_size$\times$num_heads, num_elements, dim_deads) 
-        return x.reshape(-1, x.shape[2], x.shape[3])
-
-
-    def concat_output(self, x):
-        #(batch_size$\times$num_heads, num_elements, dim_deads) >>> (batch_size, num_heads, num_elements, dim_deads)
-        x = x.reshape(-1, self.num_heads, x.shape[1], x.shape[2])
-        #(batch_size, num_heads, num_elements, dim_deads) >>> (batch_size, num_elements, num_heads, dim_deads)
-        x = x.permute(0, 2, 1, 3)
-        #(batch_size, num_elements, num_heads, dim_deads) >>> (batch_size, num_elements, num_heads$\times$dim_deads)
-        return x.reshape(x.shape[0], x.shape[1], -1)
-
-class SequenceMultiHeadAttention(nn.Module):
-    def __init__(self,dim_q:int, dim_k:int, dim_v:int, num_heads:int, dim_heads:int,dim_out:int, linear_attention=False, dropout=0.0,bias=False):
-        super().__init__()
-        dim_hiddens=num_heads*dim_heads
-        self.w_q = nn.Linear(dim_q, dim_hiddens,bias=bias)
-        self.w_k = nn.Linear(dim_k, dim_hiddens,bias=bias)
-        self.w_v = nn.Linear(dim_v, dim_hiddens,bias=bias)
-        self.mha=MultiHeadAttentionBase(num_heads=num_heads,linear_attention=linear_attention,dropout=dropout)
-        self.w_o = nn.Linear(dim_hiddens, dim_out,bias=bias)
-    
-    def forward(self, queries, keys, values):
-        q=self.w_q(queries)
-        k=self.w_k(keys)
-        v=self.w_v(values)
-        att=self.mha(q,k,v)
-        return self.w_o(att)
-
-class TwoDFieldMultiHeadAttention(nn.Module):
-
-    def __init__(self,dim_q, dim_k, dim_v, num_heads, dim_heads,dim_out, linear_attention=False, dropout=0.0,bias=False):
-        super().__init__()
-        dim_hiddens=num_heads*dim_heads
-        self.w_q = nn.Conv2d(dim_q, dim_hiddens, 1, bias=bias)
-        self.w_k = nn.Conv2d(dim_k, dim_hiddens, 1, bias=bias)
-        self.w_v = nn.Conv2d(dim_v, dim_hiddens, 1, bias=bias)
-        self.mha=MultiHeadAttentionBase(num_heads=num_heads,linear_attention=linear_attention,dropout=dropout)
-        self.w_o = nn.Conv2d(dim_hiddens, dim_out,1,bias=bias)
-    
-    def forward(self, queries, keys, values):
-        width=queries.shape[-1]
-        q=self.w_q(queries)
-        k=self.w_k(keys)
-        v=self.w_v(values)
-        q, k, v = map(lambda t: rearrange(t, "b c h w -> b (h w) c"), (q,k,v))
-        att=self.mha(q,k,v)
-        att_2D=rearrange(att,"b (h w) c -> b c h w",w=width)
-        return self.w_o(att_2D)
-    
-```
-
-
-```python
-sequence_attention=SequenceMultiHeadAttention(10,10,10,2,5,10)
-print("sequence_attention before enable fine_tuning:")
-print(sequence_attention)
-enable_fine_tuning(sequence_attention, LoRAFullFineTuningStrategy())
-print("sequence_attention after enable fine_tuning:")
-print(sequence_attention)
-print("")
-print("field attention before enable fine_tuning:")
-field_attention=TwoDFieldMultiHeadAttention(10,10,10,2,5,10)
-print("field attention after enable fine_tuning:")
-print(field_attention)
-enable_fine_tuning(field_attention, LoRAFullFineTuningStrategy())
-print(field_attention)
-```
-
-    sequence_attention before enable fine_tuning:
-    SequenceMultiHeadAttention(
-      (w_q): Linear(in_features=10, out_features=10, bias=False)
-      (w_k): Linear(in_features=10, out_features=10, bias=False)
-      (w_v): Linear(in_features=10, out_features=10, bias=False)
-      (mha): MultiHeadAttentionBase()
-      (w_o): Linear(in_features=10, out_features=10, bias=False)
-    )
-    sequence_attention after enable fine_tuning:
-    SequenceMultiHeadAttention(
-      (w_q): LoRALinear(
-        (parent_module): Linear(in_features=10, out_features=10, bias=False)
-      )
-      (w_k): LoRALinear(
-        (parent_module): Linear(in_features=10, out_features=10, bias=False)
-      )
-      (w_v): LoRALinear(
-        (parent_module): Linear(in_features=10, out_features=10, bias=False)
-      )
-      (mha): MultiHeadAttentionBase()
-      (w_o): LoRALinear(
-        (parent_module): Linear(in_features=10, out_features=10, bias=False)
-      )
-    )
-    
-    field attention before enable fine_tuning:
-    field attention after enable fine_tuning:
-    TwoDFieldMultiHeadAttention(
-      (w_q): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      (w_k): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      (w_v): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      (mha): MultiHeadAttentionBase()
-      (w_o): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-    )
-    TwoDFieldMultiHeadAttention(
-      (w_q): LoRAConv2d(
-        (parent_module): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      )
-      (w_k): LoRAConv2d(
-        (parent_module): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      )
-      (w_v): LoRAConv2d(
-        (parent_module): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      )
-      (mha): MultiHeadAttentionBase()
-      (w_o): LoRAConv2d(
-        (parent_module): Conv2d(10, 10, kernel_size=(1, 1), stride=(1, 1), bias=False)
-      )
-    )
+    Before fine-tuning, the number of trainable parameters is: 11689512
+    After fine-tuning, the number of trainable parameters is: 75063
+    --------------------------------------------------
+    index | Name                         | Type      | Shape
+    --------------------------------------------------
+    0     | conv1.lora_B                 | [448, 3]  | 1344 
+    1     | conv1.lora_A                 | [3, 21]   | 63   
+    2     | layer1.0.conv1.lora_B        | [192, 3]  | 576  
+    3     | layer1.0.conv1.lora_A        | [3, 192]  | 576  
+    4     | layer1.0.conv2.lora_B        | [192, 3]  | 576  
+    5     | layer1.0.conv2.lora_A        | [3, 192]  | 576  
+    6     | layer1.1.conv1.lora_B        | [192, 3]  | 576  
+    7     | layer1.1.conv1.lora_A        | [3, 192]  | 576  
+    8     | layer1.1.conv2.lora_B        | [192, 3]  | 576  
+    9     | layer1.1.conv2.lora_A        | [3, 192]  | 576  
+    10    | layer2.0.conv1.lora_B        | [384, 3]  | 1152 
+    11    | layer2.0.conv1.lora_A        | [3, 192]  | 576  
+    12    | layer2.0.conv2.lora_B        | [384, 3]  | 1152 
+    13    | layer2.0.conv2.lora_A        | [3, 384]  | 1152 
+    14    | layer2.0.downsample.0.lora_B | [128, 3]  | 384  
+    15    | layer2.0.downsample.0.lora_A | [3, 64]   | 192  
+    16    | layer2.1.conv1.lora_B        | [384, 3]  | 1152 
+    17    | layer2.1.conv1.lora_A        | [3, 384]  | 1152 
+    18    | layer2.1.conv2.lora_B        | [384, 3]  | 1152 
+    19    | layer2.1.conv2.lora_A        | [3, 384]  | 1152 
+    20    | layer3.0.conv1.lora_B        | [768, 3]  | 2304 
+    21    | layer3.0.conv1.lora_A        | [3, 384]  | 1152 
+    22    | layer3.0.conv2.lora_B        | [768, 3]  | 2304 
+    23    | layer3.0.conv2.lora_A        | [3, 768]  | 2304 
+    24    | layer3.0.downsample.0.lora_B | [256, 3]  | 768  
+    25    | layer3.0.downsample.0.lora_A | [3, 128]  | 384  
+    26    | layer3.1.conv1.lora_B        | [768, 3]  | 2304 
+    27    | layer3.1.conv1.lora_A        | [3, 768]  | 2304 
+    28    | layer3.1.conv2.lora_B        | [768, 3]  | 2304 
+    29    | layer3.1.conv2.lora_A        | [3, 768]  | 2304 
+    30    | layer4.0.conv1.lora_B        | [1536, 3] | 4608 
+    31    | layer4.0.conv1.lora_A        | [3, 768]  | 2304 
+    32    | layer4.0.conv2.lora_B        | [1536, 3] | 4608 
+    33    | layer4.0.conv2.lora_A        | [3, 1536] | 4608 
+    34    | layer4.0.downsample.0.lora_B | [512, 3]  | 1536 
+    35    | layer4.0.downsample.0.lora_A | [3, 256]  | 768  
+    36    | layer4.1.conv1.lora_B        | [1536, 3] | 4608 
+    37    | layer4.1.conv1.lora_A        | [3, 1536] | 4608 
+    38    | layer4.1.conv2.lora_B        | [1536, 3] | 4608 
+    39    | layer4.1.conv2.lora_A        | [3, 1536] | 4608 
+    40    | fc.lora_B                    | [1000, 3] | 3000 
+    41    | fc.lora_A                    | [3, 512]  | 1536 
+    --------------------------------------------------
 

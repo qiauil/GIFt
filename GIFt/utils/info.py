@@ -1,6 +1,7 @@
 import torch.nn as nn
 from typing import Sequence
 import os
+import copy
 
 def collect_trainable_parameters(module:nn.Module):
     index=0
@@ -15,6 +16,7 @@ def collect_trainable_parameters(module:nn.Module):
     return fine_tuning_parameters,num_para_after
 
 def table_info(table:Sequence[Sequence],header:Sequence[str],return_hline=False)->str:
+    table=copy.deepcopy(table)
     table.insert(0,header)
     col_widths = [max(len(str(item)) for item in col) for col in zip(*table)]
     h_line="-".join("-"*width for width in col_widths)

@@ -7,7 +7,7 @@ class SVDiffLinearFineTuningStrategy(FineTuningStrategy):
     def __init__(self, train_bias: bool = False) -> None:
         FineTuningStrategy.__init__(self,
                                     [
-                                        (fts.c_cname_equal2("Linear"),fts.a_replace(SVDiffLinear),{"train_bias":train_bias}),
+                                        (fts.mc_cname_equal2("Linear"),fts.ma_replace(SVDiffLinear),{"train_bias":train_bias}),
                                     ]
                                     )
         
@@ -17,9 +17,9 @@ class SVDiffConvFineTuningStrategy(FineTuningStrategy):
         config={"train_bias":train_bias}
         FineTuningStrategy.__init__(self,
                                         [
-                                            (fts.c_cname_equal2("Conv1d"),fts.a_replace(SVDiffConv1d),config),
-                                            (fts.c_cname_equal2("Conv2d"),fts.a_replace(SVDiffConv2d),config),
-                                            (fts.c_cname_equal2("Conv3d"),fts.a_replace(SVDiffConv3d),config),
+                                            (fts.mc_cname_equal2("Conv1d"),fts.ma_replace(SVDiffConv1d),config),
+                                            (fts.mc_cname_equal2("Conv2d"),fts.ma_replace(SVDiffConv2d),config),
+                                            (fts.mc_cname_equal2("Conv3d"),fts.ma_replace(SVDiffConv3d),config),
                                         ]
                                     )
 

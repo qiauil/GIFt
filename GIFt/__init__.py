@@ -56,7 +56,7 @@ def modify_modules(module:nn.Module,
         module (nn.Module): The module to modify.
         fine_tuning_strategy (FineTuningStrategy): The fine-tuning strategy to apply.
         parent_name (str, optional): DO NOT CHANGE ITS VALUE! This parameter is designed for recursivece function.
-        recurrence_level (int, optional): TDO NOT CHANGE ITS VALUE! This parameter is designed for recursivece function.
+        recurrence_level (int, optional): DO NOT CHANGE ITS VALUE! This parameter is designed for recursivece function.
 
     Raises:
         ValueError: If the module type is not supported by the fine-tuning strategy.
@@ -64,22 +64,18 @@ def modify_modules(module:nn.Module,
     Returns:
         None
     """
-    if recurrence_level==0 and len(fine_tuning_strategy.constrain_type)>0:
-        type_check=[not isinstance(module,constrain_type) for constrain_type in fine_tuning_strategy.constrain_type]
+    if recurrence_level==0 and len(fine_tuning_strategy.constraint_type)>0:
+        type_check=[not isinstance(module,constraint_type) for constraint_type in fine_tuning_strategy.constraint_type]
         if all(type_check):
             e_msg=f"Unsupport module type {get_class_name(module)} for strategy {get_class_name(fine_tuning_strategy)};"
-            e_msg+=f"Supported module types are {fine_tuning_strategy.constrain_type}."
+            e_msg+=f"Supported module types are {fine_tuning_strategy.constraint_type}."
             raise ValueError(e_msg)
     for current_name, global_name, class_name, current_module, has_child in ModuleIterator(module,parent_name):
-        find=False
         if isinstance(current_module,FinetuableModule):
             raise ValueError(f"Layer {global_name} is already finetuable")
-        find=fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
-        if not find:
-            if has_child:
-                modify_modules(current_module,fine_tuning_strategy,global_name,recurrence_level+1)
-            else:
-                freeze_module(current_module)
+        fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
+        if has_child:
+            modify_modules(current_module,fine_tuning_strategy,global_name,recurrence_level+1)
 
 def enable_fine_tuning(module:nn.Module,
                       fine_tuning_strategy:FineTuningStrategy,
