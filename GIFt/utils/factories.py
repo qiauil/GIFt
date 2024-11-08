@@ -294,3 +294,22 @@ def ma_replace(replace_func:Callable):
             replace_func(current_module,**fine_tuning_paras)
             )
     return action_func
+
+def pc_independent():
+    """
+    return a check function that checks if the parameter is independent. 
+    I.e., the current module does not have any submodules but only parameters.
+    """
+    
+    def check_func(parent_module:nn.Module, 
+                   current_name:str, 
+                   global_name:str, 
+                   class_name:str, 
+                   current_module:nn.Module,
+                   name:str,
+                   para:nn.parameter):
+        if len(list(current_module._modules.items())) != 0 and len(list(current_module.named_parameters(recurse=False))) != 0:
+            return True
+        return False
+    
+    return check_func

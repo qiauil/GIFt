@@ -169,12 +169,12 @@ class FineTuningStrategy(InitParaRecorder):
                  class_name: str, 
                  current_module: nn.Module):
         if len(self.para_caps) == 0:
-            for name, para in current_module.named_parameters():
+            for name, para in current_module.named_parameters(recurse=False):
                 para.requires_grad=False
         else:
             for cap in self.para_caps:
                 check_func, act_func, act_para = self.para_caps._extract_cap(cap)
-                for name, para in current_module.named_parameters():
+                for name, para in current_module.named_parameters(recurse=False):
                     if check_func(parent_module, current_name, global_name, class_name, current_module, name, para):
                         if isinstance(act_func, FineTuningStrategy):
                             assert act_para == {}, f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function."
@@ -238,7 +238,9 @@ def DeBugStrategy(strategy:FineTuningStrategy) -> FineTuningStrategy:
 class FullFineTuningStrategy(FineTuningStrategy):
     
     def __init__(self, ) -> None:
-        super().__init__([],[],[])
+        super().__init__([],[(lambda *args,**kwargs: True,
+                              lambda *args,**kwargs: True,
+                              {})],[])
 
 def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrategy:
     """
