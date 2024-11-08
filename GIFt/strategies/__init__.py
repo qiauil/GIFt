@@ -161,6 +161,7 @@ class FineTuningStrategy(InitParaRecorder):
                     act_func.check_module(parent_module, current_name, global_name, class_name, current_module)
                 else:
                     act_func(parent_module, current_name, global_name, class_name, current_module,**act_para)    
+                break
     
     def check_para(self,
                    parent_module: Optional[nn.Module], 
@@ -172,17 +173,20 @@ class FineTuningStrategy(InitParaRecorder):
             for name, para in current_module.named_parameters(recurse=False):
                 para.requires_grad=False
         else:
-            for cap in self.para_caps:
-                check_func, act_func, act_para = self.para_caps._extract_cap(cap)
-                for name, para in current_module.named_parameters(recurse=False):
+            find=False
+            for name, para in current_module.named_parameters(recurse=False):
+                for cap in self.para_caps:
+                    check_func, act_func, act_para = self.para_caps._extract_cap(cap)
                     if check_func(parent_module, current_name, global_name, class_name, current_module, name, para):
                         if isinstance(act_func, FineTuningStrategy):
                             assert act_para == {}, f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function."
                             act_func.check_para(parent_module, current_name, global_name, class_name, current_module)
                         else:
                             act_func(parent_module, current_name, global_name, class_name, current_module, name, para, **act_para)
-                    else:
-                        para.requires_grad=False
+                        find=True
+                        break
+                if not find:
+                    para.requires_grad=False
 
     def regisier_constraint_type(self, constraint_type: Type):
         """
@@ -242,12 +246,18 @@ class FullFineTuningStrategy(FineTuningStrategy):
                               lambda *args,**kwargs: True,
                               {})],[])
 
-def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrategy:
+def merger_strategy(strategies: Sequence[FineTuningStrategy],
+                    additional_module_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]] = [],
+                    additional_para_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]] = [],) -> FineTuningStrategy:
     """
     Merges multiple FineTuningStrategy objects into a single FineTuningStrategy object.
 
     Args:
         strategies (Sequence[FineTuningStrategy]): A sequence of FineTuningStrategy objects.
+        additional_module_caps (Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]], optional):
+            Additional module caps to add to the merged strategy. Defaults to an empty list.
+        additional_para_caps (Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]], optional):
+            Additional parameter caps to add to the merged strategy. Defaults to an empty list.
 
     Returns:
         FineTuningStrategy: The merged FineTuningStrategy object.
@@ -260,6 +270,8 @@ def merger_strategy(strategies: Sequence[FineTuningStrategy]) -> FineTuningStrat
         new_module_caps.extend(strategy.moule_caps.caps)
         new_para_caps.extend(strategy.para_caps.caps)
         constraints.append(strategy.constraint_type)
+    new_module_caps.extend(additional_module_caps)
+    new_para_caps.extend(additional_para_caps)
     new_constraints=[]
     for constraint in constraints:
         if len(constraint)>0:

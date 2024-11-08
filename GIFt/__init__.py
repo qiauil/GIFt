@@ -76,6 +76,13 @@ def modify_modules(module:nn.Module,
         fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
         if has_child:
             modify_modules(current_module,fine_tuning_strategy,global_name,recurrence_level+1)
+    if recurrence_level==0:
+        # check parameters for the top module
+        fine_tuning_strategy.check_para(parent_module=None,
+                                        current_name=parent_name,
+                                        global_name=parent_name,
+                                        class_name=module.__class__.__name__,
+                                        current_module=module)
 
 def enable_fine_tuning(module:nn.Module,
                       fine_tuning_strategy:FineTuningStrategy,
