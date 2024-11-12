@@ -118,6 +118,7 @@ class FineTuningStrategy(InitParaRecorder):
                  module_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]] = [],
                  para_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]] = [],
                  constraint_type: Optional[Union[Sequence[Type], Type]] = []) -> None:
+        super().__init__()
         self.constraint_type = constraint_type
         if not isinstance(self.constraint_type, Sequence):
             self.constraint_type = [self.constraint_type]
