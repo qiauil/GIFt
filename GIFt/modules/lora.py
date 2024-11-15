@@ -232,7 +232,7 @@ class LoRAConv(LoRALinearLike):
                 '''
                 see comments in LoRALinearLike
                 '''
-                self.parent_module(x)+self.parent_module._conv_forward(
+                return self.parent_module(x)+self.parent_module._conv_forward(
                 self.lora_dropout(x), 
                 self.lora_weight(),
                 bias=None)

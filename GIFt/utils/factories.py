@@ -259,7 +259,7 @@ def mc_cname_contains(target_classname:str):
                 return False
     return check_func
 
-def mc_cname_in_sequence(target_classnames:Sequence[str]):
+def mc_cname_contains_sequence(target_classnames:Sequence[str]):
     """
     Returns a check function that checks if the module class name contains one of the target_names.
 
