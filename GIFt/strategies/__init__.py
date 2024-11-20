@@ -165,8 +165,8 @@ class FineTuningStrategy(InitParaRecorder):
                     act_func.check_module(parent_module, current_name, global_name, class_name, current_module)
                 else:
                     act_func(parent_module, current_name, global_name, class_name, current_module,**act_para)    
-            module_modified=True
-            break
+                module_modified=True
+                break
         return module_modified
     
     def check_para(self,
