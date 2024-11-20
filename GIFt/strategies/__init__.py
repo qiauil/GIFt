@@ -145,8 +145,10 @@ class FineTuningStrategy(InitParaRecorder):
             Any: True if the strategy is applicable, False otherwise.
 
         """
-        self.check_para(parent_module, current_name, global_name, class_name, current_module)
-        self.check_module(parent_module, current_name, global_name, class_name, current_module)
+        module_modified=self.check_module(parent_module, current_name, global_name, class_name, current_module)
+        if not module_modified:
+            self.check_para(parent_module, current_name, global_name, class_name, current_module)
+        return module_modified
         
     def check_module(self,
                      parent_module: Optional[nn.Module], 
@@ -154,6 +156,7 @@ class FineTuningStrategy(InitParaRecorder):
                  global_name: str, 
                  class_name: str, 
                  current_module: nn.Module):
+        module_modified=False
         for cap in self.moule_caps:
             check_func, act_func, act_para = self.moule_caps._extract_cap(cap)
             if check_func(parent_module, current_name, global_name, class_name, current_module):
@@ -162,7 +165,9 @@ class FineTuningStrategy(InitParaRecorder):
                     act_func.check_module(parent_module, current_name, global_name, class_name, current_module)
                 else:
                     act_func(parent_module, current_name, global_name, class_name, current_module,**act_para)    
-                break
+            module_modified=True
+            break
+        return module_modified
     
     def check_para(self,
                    parent_module: Optional[nn.Module], 

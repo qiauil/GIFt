@@ -73,8 +73,8 @@ def modify_modules(module:nn.Module,
     for current_name, global_name, class_name, current_module, has_child in ModuleIterator(module,parent_name):
         if isinstance(current_module,FinetuableModule):
             raise ValueError(f"Layer {global_name} is already finetuable")
-        fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
-        if has_child:
+        module_modified=fine_tuning_strategy(module,current_name,global_name,class_name,current_module)
+        if has_child and not module_modified:
             modify_modules(current_module,fine_tuning_strategy,global_name,recurrence_level+1)
     if recurrence_level==0:
         # check parameters for the top module
