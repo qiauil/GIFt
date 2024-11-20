@@ -145,9 +145,9 @@ class FineTuningStrategy(InitParaRecorder):
             Any: True if the strategy is applicable, False otherwise.
 
         """
-        self.check_module(parent_module, current_name, global_name, class_name, current_module)
         self.check_para(parent_module, current_name, global_name, class_name, current_module)
-    
+        self.check_module(parent_module, current_name, global_name, class_name, current_module)
+        
     def check_module(self,
                      parent_module: Optional[nn.Module], 
                  current_name: str, 
@@ -170,24 +170,21 @@ class FineTuningStrategy(InitParaRecorder):
                  global_name: str, 
                  class_name: str, 
                  current_module: nn.Module):
-        if len(self.para_caps) == 0:
-            for name, para in current_module.named_parameters(recurse=False):
-                para.requires_grad=False
-        else:
+
+        for name, para in current_module.named_parameters(recurse=False):
             find=False
-            for name, para in current_module.named_parameters(recurse=False):
-                for cap in self.para_caps:
-                    check_func, act_func, act_para = self.para_caps._extract_cap(cap)
-                    if check_func(parent_module, current_name, global_name, class_name, current_module, name, para):
-                        if isinstance(act_func, FineTuningStrategy):
-                            assert act_para == {}, f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function."
-                            act_func.check_para(parent_module, current_name, global_name, class_name, current_module)
-                        else:
-                            act_func(parent_module, current_name, global_name, class_name, current_module, name, para, **act_para)
-                        find=True
-                        break
-                if not find:
-                    para.requires_grad=False
+            for cap in self.para_caps:
+                check_func, act_func, act_para = self.para_caps._extract_cap(cap)
+                if check_func(parent_module, current_name, global_name, class_name, current_module, name, para):
+                    if isinstance(act_func, FineTuningStrategy):
+                        assert act_para == {}, f"Unexpected parameter {act_para} for strategy {get_class_name(act_para)} as an action function."
+                        act_func.check_para(parent_module, current_name, global_name, class_name, current_module)
+                    else:
+                        act_func(parent_module, current_name, global_name, class_name, current_module, name, para, **act_para)
+                    find=True
+                    break
+            if not find:
+                para.requires_grad=False
 
     def regisier_constraint_type(self, constraint_type: Type):
         """
