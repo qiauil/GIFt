@@ -201,6 +201,29 @@ class LoRALinearLike(LoRALayer):
             NotImplementedError: This is an abstract class, please use LoRALinear.
         """
         raise NotImplementedError('This is an abstract class, please use LoRALinear')
+    
+    @property
+    def weight(self):
+        """
+        The weight of the parent module.
+
+        Returns:
+            torch.Tensor: The weight of the parent module.
+        """
+        if self.merged:
+            return self.parent_module.weight
+        else:
+            return self.parent_module.weight + self.lora_weight()
+    
+    @property
+    def bias(self):
+        """
+        The bias of the parent module.
+
+        Returns:
+            torch.Tensor: The bias of the parent module.
+        """
+        return self.parent_module.bias
 
 class LoRAConv(LoRALinearLike):
     """
@@ -245,7 +268,7 @@ class LoRAConv(LoRALinearLike):
         else:
             if not self.merged:
                 self.merge_weight()
-        return self.parent_module(x)
+            return self.parent_module(x)
 
 class LoRALinear(LoRALinearLike):
     """
