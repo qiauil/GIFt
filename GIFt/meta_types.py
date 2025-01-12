@@ -5,6 +5,7 @@ class FinetuningType(Enum):
     FINE_TUNE = 0
     FREEZE = 1
     TRAIN = 2
+    AUTO = 3
 
 class ConvWeightHWType(StrEnum):
     """

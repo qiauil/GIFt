@@ -2,7 +2,9 @@ import torch.nn as nn
 from typing import Union
 from ..meta_types import FinetuningType,ConvWeightHWType
 
-def freeze_module(module: nn.Module, weights_type: FinetuningType=FinetuningType.FINE_TUNE,bias_type: FinetuningType=FinetuningType.FREEZE):
+def freeze_module(module: nn.Module, 
+                  weights_type: FinetuningType=FinetuningType.FINE_TUNE,
+                  bias_type: FinetuningType=FinetuningType.FREEZE):
     """
     Freezes or unfreezes the parameters of a given module based on the specified fine_tuning types.
 
@@ -12,12 +14,18 @@ def freeze_module(module: nn.Module, weights_type: FinetuningType=FinetuningType
         bias_type (FinetuningType, optional): The fine_tuning type for bias parameters. Defaults to FinetuningType.FREEZE.
     """
     for name,param in module.named_parameters():
-        if "weight" in name and weights_type == FinetuningType.TRAIN:
-            param.requires_grad = True
-        elif "bias" in name and bias_type == FinetuningType.TRAIN:
-            param.requires_grad = True
-        else:
-            param.requires_grad = False
+        if "weight" in name:
+            if weights_type != FinetuningType.AUTO:
+                if weights_type == FinetuningType.TRAIN:
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+        elif "bias" in name:
+            if bias_type != FinetuningType.AUTO:
+                if bias_type == FinetuningType.TRAIN:
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
             
 def trainable_parameters(module:nn.Module,recurse:bool=True):
     for name, param in module.named_parameters(recurse=recurse):
