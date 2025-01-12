@@ -104,7 +104,7 @@ class LoRALinearLike(LoRALayer):
         rank (int): The rank of the LoRA decomposition.
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA. Defaults to 0.
-        train_bias (bool, optional): Whether to train the bias. Defaults to False.
+        train_bias (bool, optional): Whether to train the bias. Defaults to False. If False, the training of the bias is the same as the origional module.
     """
 
     def __init__(self,
@@ -143,7 +143,7 @@ class LoRALinearLike(LoRALayer):
             self.shape_transfer = lambda ori_tensor: ori_tensor
         freeze_module(self.parent_module, 
                       weights_type=FinetuningType.FINE_TUNE,
-                      bias_type=FinetuningType.TRAIN if train_bias else FinetuningType.FREEZE
+                      bias_type=FinetuningType.TRAIN if train_bias else FinetuningType.AUTO
                       )
 
     '''
@@ -235,7 +235,7 @@ class LoRAConv(LoRALinearLike):
         rank (int): The rank of the LoRA regularization.
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA regularization. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA regularization. Defaults to 0.
-        train_bias (bool, optional): Whether to train the bias term. Defaults to False.
+        train_bias (bool, optional): Whether to train the bias term. Defaults to False. If False, the training of the bias is the same as the origional module.
     """
 
     def __init__(self, parent_module: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d],
@@ -279,7 +279,7 @@ class LoRALinear(LoRALinearLike):
         rank (int): The rank of the LoRA regularization.
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA regularization. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA regularization. Defaults to 0.
-        train_bias (bool, optional): Whether to train the bias term. Defaults to False.
+        train_bias (bool, optional): Whether to train the bias term. Defaults to False. If False, the training of the bias is the same as the origional module.
     """
     
     def __init__(self, 
@@ -330,7 +330,7 @@ class LoRAConv1d(LoRAConv):
         rank (int): The rank of the LoRAConv1d layer.
         lora_alpha (Optional[int], optional): The alpha parameter for LoRAConv1d. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRAConv1d. Defaults to 0.0.
-        train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False.
+        train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False. If False, the training of the bias is the same as the origional module.
     """
     
     def __init__(self, 
@@ -350,7 +350,7 @@ class LoRAConv2d(LoRAConv):
         rank (int): The rank of the LoRAConv1d layer.
         lora_alpha (Optional[int], optional): The alpha parameter for LoRAConv1d. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRAConv1d. Defaults to 0.0.
-        train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False.
+        train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False. If False, the training of the bias is the same as the origional module.
     """
         
     def __init__(self, 
@@ -370,7 +370,7 @@ class LoRAConv3d(LoRAConv):
         rank (int): The rank of the LoRAConv1d layer.
         lora_alpha (Optional[int], optional): The alpha parameter for LoRAConv1d. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRAConv1d. Defaults to 0.0.
-        train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False.
+        train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False. If False, the training of the bias is the same as the origional module.
     """
     
     def __init__(self, 
