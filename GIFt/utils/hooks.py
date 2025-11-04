@@ -6,12 +6,23 @@ def fine_tuning_sd_hook(module:nn.Module, state_dict, *args, **kwargs):
     rather than create a new state_dict with trainable parameters only. This is because sometimes the state_dict also contains 
     untrainable buffers, which should be kept in the state_dict.
     '''
-    new_state_dict = {}
-    not_requires_grad_paras=[name for name,param in module.named_parameters() if not param.requires_grad]
-    # Maybe also include buffer?
-    for key, value in state_dict.items():
-        if key not in not_requires_grad_paras:
-            new_state_dict[key] = value
+    # Only use names local to this module
+    not_trainable = {
+        name for name, param in module.named_parameters(recurse=False)
+        if not param.requires_grad
+    }
+
+    # Also remove from submodules recursively
+    for child_name, child in module.named_children():
+        for name, param in child.named_parameters():
+            if not param.requires_grad:
+                not_trainable.add(f"{child_name}.{name}")
+
+    # Now filter the state_dict (keys are relative to this module)
+    new_state_dict = {
+        k: v for k, v in state_dict.items() if k not in not_trainable
+    }
+
     return new_state_dict
 
 def fine_tuning_loadsd_posthook(module:nn.Module, incompatible_keys):
