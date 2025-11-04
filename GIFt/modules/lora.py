@@ -73,7 +73,7 @@ class LoRALayer(FinetuableModule):
         """
         nn.init.zeros_(B_para)
         
-    def _lora_A_initilization(self,A_para):
+    def _lora_A_initialization(self,A_para):
         """
         Initializes the A parameter using Kaiming uniform initialization.
         In the LoRA paper, they mentioned that 'We use a random Gaussian initialization for A and zero for B'.
@@ -117,22 +117,23 @@ class LoRALinearLike(LoRALayer):
                  train_bias: bool = False):
         super().__init__(rank, lora_alpha, lora_dropout)
         if h_weight*w_weight < rank*(h_weight+w_weight):
-            msg="Your rank is so large that the number of parameters in the LoRA decomposition is larger than the original weight matrix."
-            msg += os.linesep
-            msg+=r"Number of parameters in origional weight matrix: ${}\times{}={}$.".format(h_weight,w_weight,h_weight*w_weight)
-            msg += os.linesep
-            msg+=r"Number of parameters in LoRA decomposition: ${}\times{}+{}\times{}={}$.".format(h_weight,
-                                                                                                   rank,
-                                                                                                   rank,
-                                                                                                   w_weight,rank*(h_weight+w_weight)
-                                                                                                   )
+            msg=f"Your rank is so large that the new LoRA weight matrix {h_weight}x{rank}+{rank}x{w_weight} is larger than the original weight matrix {h_weight}x{w_weight}."
+            #msg="Your rank is so large that the number of parameters in the LoRA decomposition is larger than the original weight matrix."
+            #msg += os.linesep
+            #msg+=r"Number of parameters in origional weight matrix: ${}\times{}={}$.".format(h_weight,w_weight,h_weight*w_weight)
+            #msg += os.linesep
+            #msg+=r"Number of parameters in LoRA decomposition: ${}\times{}+{}\times{}={}$.".format(h_weight,
+                                                                                                   #rank,
+                                                                                                   #rank,
+                                                                                                   #w_weight,rank*(h_weight+w_weight)
+                                                                                                   #)
             warn(msg)
         self.parent_module = parent_module
         # Actual trainable parameters
         self.lora_B = nn.Parameter(self.parent_module.weight.new_zeros((h_weight, rank)))
         self.lora_A = nn.Parameter(self.parent_module.weight.new_zeros((rank, w_weight)))
         self._lora_B_initialization(self.lora_B)
-        self._lora_A_initilization(self.lora_A)
+        self._lora_A_initialization(self.lora_A)
 
         weight_shape = self.parent_module.weight.shape
         if len(weight_shape) != 2 or (weight_shape[0] != h_weight or weight_shape[1] != w_weight):
