@@ -86,7 +86,8 @@ def modify_modules(module:nn.Module,
 
 def enable_fine_tuning(module:nn.Module,
                       fine_tuning_strategy:FineTuningStrategy,
-                      replace_parameter_function:bool=True):
+                      replace_parameter_function:bool=True,
+                      trainable_state_dict:bool=True):
     """
     Enable fine-tuning for a given module.
 
@@ -98,6 +99,7 @@ def enable_fine_tuning(module:nn.Module,
             avoiding you modifying your optimizer initialization code. If you set it as False, you 
             can use the `trainable_parameters` function from `GIFt.utils.network_tool` to get trainable parameters of 
             your network for an optimizer.
+        trainable_state_dict (bool): Whether to save only trainable parameters in the state_dict.
 
     Returns:
         None
@@ -105,9 +107,10 @@ def enable_fine_tuning(module:nn.Module,
     # replace modules
     modify_modules(module,fine_tuning_strategy)
     # add hook to the module to remove untrainable parameters from the state_dict
-    module._register_state_dict_hook(fine_tuning_sd_hook)
-    # add hook to the module to enable load_state_dict to load the finetuned model
-    module.register_load_state_dict_post_hook(fine_tuning_loadsd_posthook)
+    if trainable_state_dict:
+        module._register_state_dict_hook(fine_tuning_sd_hook)
+        # add hook to the module to enable load_state_dict to load the finetuned model
+        module.register_load_state_dict_post_hook(fine_tuning_loadsd_posthook)
     # add trainable_parameters function to the module
     if replace_parameter_function:
         setattr(module,"parameters",lambda recurse=True: trainable_parameters(module,recurse))
