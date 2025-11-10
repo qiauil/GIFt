@@ -84,16 +84,6 @@ class LoRALayer(FinetuableModule):
             A_para (torch.Tensor): The A parameter tensor.
         """
         nn.init.kaiming_uniform_(A_para, a=math.sqrt(5))
-        
-    def state_dict(self, *args, **kwargs):
-        if self.merged:
-            self.unmerge_weight()
-        return super().state_dict(*args, **kwargs)
-
-    def load_state_dict(self, state_dict, strict=True):
-        if self.merged:
-            self.unmerge_weight()
-        super().load_state_dict(state_dict, strict)
 
 class LoRALinearLike(LoRALayer):
     """
@@ -235,6 +225,16 @@ class LoRALinearLike(LoRALayer):
             torch.Tensor: The bias of the parent module.
         """
         return self.parent_module.bias
+    
+    def state_dict(self, *args, **kwargs):
+        if self.merged:
+            self.unmerge_weight()
+        return super().state_dict(*args, **kwargs)
+
+    def load_state_dict(self, state_dict, strict=True):
+        if self.merged:
+            self.unmerge_weight()
+        super().load_state_dict(state_dict, strict)
 
 class LoRAConv(LoRALinearLike):
     """
