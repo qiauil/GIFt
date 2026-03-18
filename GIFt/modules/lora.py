@@ -118,15 +118,6 @@ class LoRALinearLike(LoRALayer):
         super().__init__(rank, lora_alpha, lora_dropout)
         if h_weight*w_weight < rank*(h_weight+w_weight):
             msg=f"Your rank is so large that the new LoRA weight matrix {h_weight}x{rank}+{rank}x{w_weight} is larger than the original weight matrix {h_weight}x{w_weight}."
-            #msg="Your rank is so large that the number of parameters in the LoRA decomposition is larger than the original weight matrix."
-            #msg += os.linesep
-            #msg+=r"Number of parameters in origional weight matrix: ${}\times{}={}$.".format(h_weight,w_weight,h_weight*w_weight)
-            #msg += os.linesep
-            #msg+=r"Number of parameters in LoRA decomposition: ${}\times{}+{}\times{}={}$.".format(h_weight,
-                                                                                                   #rank,
-                                                                                                   #rank,
-                                                                                                   #w_weight,rank*(h_weight+w_weight)
-                                                                                                   #)
             warn(msg)
         self.parent_module = parent_module
         # Actual trainable parameters
@@ -225,7 +216,7 @@ class LoRALinearLike(LoRALayer):
             torch.Tensor: The bias of the parent module.
         """
         return self.parent_module.bias
-    
+
     def state_dict(self, *args, **kwargs):
         if self.merged:
             self.unmerge_weight()
@@ -247,6 +238,36 @@ class LoRAConv(LoRALinearLike):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA regularization. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA regularization. Defaults to 0.
         train_bias (bool, optional): Whether to train the bias term. Defaults to False. If False, the training of the bias is the same as the origional module.
+    
+    Although a more general implementation of LoRAConv is as follows, where we avoid construct the whole LoRA weight matrix 
+    (check https://qiauil.github.io/blog/2026/lora/ to see whether you need avoid construct the whole matrix),
+    
+    class LoRAConv3d(Module):
+    def __init__(self, parent_module, rank):
+        super().__init__()
+        self.parent_module=parent_module
+        self.rank=rank
+        weight_shapes=tuple(self.parent_module.weight.data.shape)
+        self.lora_b=nn.Parameter(self.parent_module.weight.new_zeros((weight_shapes[0],rank)+(1,)*len(weight_shapes[2:])))
+        self.lora_a=nn.Parameter(self.parent_module.weight.new_zeros((rank,weight_shapes[1])+weight_shapes[2:]))
+        nn.init.kaiming_uniform_(self.lora_a,a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.lora_b,a=math.sqrt(5))
+        self.parent_module.weight.requires_grad=False
+        self.parent_module.bias.requires_grad=False
+        
+    def forward(self,x):
+        out=self.parent_module(x)
+        out+=F.conv3d(self.parent_module._conv_forward(x,self.lora_a,bias=None),weight=self.lora_b,bias=None)
+        return out
+    
+    def merged_forward(self,x):
+        dw=torch.einsum("or,ri...->oi...",self.lora_b.view(self.lora_b.shape[0],self.lora_b.shape[1]),self.lora_a)
+        return self.parent_module._conv_forward(x,self.parent_module.weight+dw,self.parent_module.bias)
+    
+    
+    the bottleneck of the convolution operation in PyTorch is actually the convolution itself, rather than the addition of the LoRA weight. Thus, we will construct the whole LoRA weight matrix for simplicity.
+    Thus we should avoid introducing new convolution operations.
+    
     """
 
     def __init__(self, parent_module: Union[nn.Conv1d, nn.Conv2d, nn.Conv3d],
@@ -306,31 +327,20 @@ class LoRALinear(LoRALinearLike):
                          lora_dropout, 
                          train_bias)
         
-    def forward(self, x: torch.Tensor):
+    def forward(self, x):
         if self.training:
             if self.merged:
                 self.unmerge_weight()
+            out=self.parent_module(x)
             if self.run_dropout:
-                '''
-                There are three method to add the lora_weight to the parent_module:
-                * `self.parent_module(x)+(self.lora_weight() @ x.T).T` 
-                * `self.parent_module(x)+torch.functional.F.linear(x,self.lora_weight())`
-                * `torch.functional.F.linear(x,self.parent_module.weight+self.lora_weight(),self.parent_module.bias)`
-                The first method is the most slow one and the last one is the fastest one.
-                However, the last one does not support dropout.
-                Thus, if dropout is used, the second method is the best choice, otherwise the last one is the best choice.
-                '''
-                return self.parent_module(x)+F.linear(self.lora_dropout(x),
-                                                    self.lora_weight(),
-                                                    bias=None)
-            else:
-                return F.linear(x,
-                                self.parent_module.weight+self.lora_weight(),
-                                self.parent_module.bias)
+                x=self.lora_dropout(x)
+            out+=(x @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
+            return out
         else:
             if not self.merged:
                 self.merge_weight()
-            return self.parent_module(x)  
+            out=self.parent_module(x)
+            return out
 
 class LoRAConv1d(LoRAConv):
     """
