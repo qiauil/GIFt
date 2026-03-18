@@ -93,7 +93,7 @@ class _CAPBase():
     def __getitem__(self, index):
         return self.caps[index]
 
-class FineTuningStrategy(InitParaRecorder):
+class FineTuningStrategy():
     """
     A class representing a fine-tuning strategy.
 
@@ -118,7 +118,7 @@ class FineTuningStrategy(InitParaRecorder):
                  module_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module],bool], Callable, dict]] = [],
                  para_caps: Sequence[Tuple[Callable[[nn.Module,str,str,str,nn.Module,str,nn.Parameter],bool], Callable, dict]] = [],
                  constraint_type: Optional[Union[Sequence[Type], Type]] = []) -> None:
-        super().__init__()
+        #super().__init__()
         self.constraint_type = constraint_type
         if not isinstance(self.constraint_type, Sequence):
             self.constraint_type = [self.constraint_type]
