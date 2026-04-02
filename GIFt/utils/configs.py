@@ -123,8 +123,6 @@ class InitParaRecorder():
                 "target":".".join([self.__class__.__module__,self.__class__.__name__]),
                 "params":para_dict
             }
-        else:
-            print("Failed to find frame for current call of __init__")
         return self.init_paras
     
     def save_init_paras(self,path):
