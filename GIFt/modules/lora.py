@@ -105,6 +105,7 @@ class LoRALinearLike(LoRALayer):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA. Defaults to 0.
         train_bias (bool, optional): Whether to train the bias. Defaults to False. If False, the training of the bias is the same as the origional module.
+        large_rank_warning (bool, optional): Whether to warn if the rank is large. Defaults to True.
     """
 
     def __init__(self,
@@ -114,9 +115,10 @@ class LoRALinearLike(LoRALayer):
                  rank: int,
                  lora_alpha: Optional[int] = None,
                  lora_dropout: float = 0,
-                 train_bias: bool = False):
+                 train_bias: bool = False,
+                 large_rank_warning: bool = True):
         super().__init__(rank, lora_alpha, lora_dropout)
-        if h_weight*w_weight < rank*(h_weight+w_weight):
+        if h_weight*w_weight < rank*(h_weight+w_weight) and large_rank_warning:
             msg=f"Your rank is so large that the new LoRA weight matrix {h_weight}x{rank}+{rank}x{w_weight} is larger than the original weight matrix {h_weight}x{w_weight}."
             warn(msg)
         self.parent_module = parent_module
@@ -238,6 +240,7 @@ class LoRAConv(LoRALinearLike):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA regularization. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA regularization. Defaults to 0.
         train_bias (bool, optional): Whether to train the bias term. Defaults to False. If False, the training of the bias is the same as the origional module.
+        large_rank_warning (bool, optional): Whether to warn if the rank is large. Defaults to True.
     
     Although a more general implementation of LoRAConv is as follows, where we avoid construct the whole LoRA weight matrix 
     (check https://qiauil.github.io/blog/2026/lora/ to see whether you need avoid construct the whole matrix),
@@ -274,9 +277,10 @@ class LoRAConv(LoRALinearLike):
                  rank: int, 
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0, 
-                 train_bias=False):
+                 train_bias=False,
+                 large_rank_warning=True):
         h_weight, w_weight = conv_weight_hw(parent_module)
-        super().__init__(parent_module, h_weight, w_weight, rank, lora_alpha, lora_dropout, train_bias)
+        super().__init__(parent_module, h_weight, w_weight, rank, lora_alpha, lora_dropout, train_bias, large_rank_warning)
         
 
     def forward(self, x):
@@ -312,6 +316,7 @@ class LoRALinear(LoRALinearLike):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRA regularization. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRA regularization. Defaults to 0.
         train_bias (bool, optional): Whether to train the bias term. Defaults to False. If False, the training of the bias is the same as the origional module.
+        large_rank_warning (bool, optional): Whether to warn if the rank is large. Defaults to True.
     """
     
     def __init__(self, 
@@ -319,14 +324,16 @@ class LoRALinear(LoRALinearLike):
                  rank: int, 
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0.0, 
-                 train_bias=False):        
+                 train_bias=False,
+                 large_rank_warning=True):        
         super().__init__(parent_module, 
                          parent_module.out_features, 
                          parent_module.in_features, 
                          rank, lora_alpha, 
                          lora_dropout, 
-                         train_bias)
-        
+                         train_bias, 
+                         large_rank_warning)
+
     def forward(self, x):
         if self.training:
             if self.merged:
@@ -352,6 +359,7 @@ class LoRAConv1d(LoRAConv):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRAConv1d. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRAConv1d. Defaults to 0.0.
         train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False. If False, the training of the bias is the same as the origional module.
+        large_rank_warning (bool, optional): Whether to warn if the rank is large. Defaults to True. 
     """
     
     def __init__(self, 
@@ -359,8 +367,9 @@ class LoRAConv1d(LoRAConv):
                  rank: int, 
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0.0, 
-                 train_bias=False):
-        super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias)
+                 train_bias=False,
+                 large_rank_warning=True):
+        super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias, large_rank_warning)
 
 class LoRAConv2d(LoRAConv):
     """
@@ -372,6 +381,7 @@ class LoRAConv2d(LoRAConv):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRAConv1d. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRAConv1d. Defaults to 0.0.
         train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False. If False, the training of the bias is the same as the origional module.
+        large_rank_warning (bool, optional): Whether to warn if the rank is large. Defaults to True.
     """
         
     def __init__(self, 
@@ -379,8 +389,9 @@ class LoRAConv2d(LoRAConv):
                 rank: int, 
                 lora_alpha: Optional[int]=None, 
                 lora_dropout: float = 0.0, 
-                train_bias=False):
-        super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias)
+                train_bias=False,
+                large_rank_warning=True):
+        super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias, large_rank_warning)
 
 class LoRAConv3d(LoRAConv):
     """
@@ -392,6 +403,7 @@ class LoRAConv3d(LoRAConv):
         lora_alpha (Optional[int], optional): The alpha parameter for LoRAConv1d. Defaults to None.
         lora_dropout (float, optional): The dropout rate for LoRAConv1d. Defaults to 0.0.
         train_bias (bool, optional): Whether to train the bias of LoRAConv1d. Defaults to False. If False, the training of the bias is the same as the origional module.
+        large_rank_warning (bool, optional): Whether to warn if the rank is large. Defaults to True.
     """
     
     def __init__(self, 
@@ -399,5 +411,6 @@ class LoRAConv3d(LoRAConv):
                  rank: int, 
                  lora_alpha: Optional[int]=None, 
                  lora_dropout: float = 0.0, 
-                 train_bias=False):
-        super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias)
+                 train_bias=False,
+                 large_rank_warning=True):
+        super().__init__(parent_module, rank, lora_alpha, lora_dropout, train_bias, large_rank_warning)

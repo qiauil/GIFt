@@ -9,16 +9,19 @@ class LoRAConfigMixin():
     def __init__(self,rank:int=3,
                  lora_alpha:Optional[float]=None,
                  lora_dropout:float=0.0,
-                 train_bias:bool=False) -> None:
+                 train_bias:bool=False,
+                 large_rank_warning:bool=True) -> None:
         self._rank=rank
         self._lora_alpha=lora_alpha
         self._lora_dropout=lora_dropout
         self._train_bias=train_bias
+        self._large_rank_warning=large_rank_warning
         self._lora_configs={
             "rank":self._rank,
             "lora_alpha":self._lora_alpha, 
             "lora_dropout":self._lora_dropout, 
-            "train_bias":self._train_bias
+            "train_bias":self._train_bias,
+            "large_rank_warning":self._large_rank_warning
         }
     
     def lora_configs(self) -> Dict:
@@ -29,8 +32,9 @@ class LoRALinearFineTuningStrategy(LoRAConfigMixin,FineTuningStrategy):
     def __init__(self, rank: int = 3, 
                  lora_alpha: float | None = None, 
                  lora_dropout: float = 0, 
-                 train_bias: bool = False) -> None:
-        LoRAConfigMixin.__init__(self,rank,lora_alpha,lora_dropout,train_bias)
+                 train_bias: bool = False,
+                 large_rank_warning:bool=True) -> None:
+        LoRAConfigMixin.__init__(self,rank,lora_alpha,lora_dropout,train_bias,large_rank_warning)
         FineTuningStrategy.__init__(self,
                                     [
                                         (fts.mc_cname_equal2("Linear"),fts.ma_replace(LoRALinear),self.lora_configs()),
@@ -42,8 +46,9 @@ class LoRAConvFineTuningStrategy(LoRAConfigMixin,FineTuningStrategy):
     def __init__(self, rank: int = 3, 
                  lora_alpha: float | None = None, 
                  lora_dropout: float = 0, 
-                 train_bias: bool = False) -> None:
-        LoRAConfigMixin.__init__(self,rank,lora_alpha,lora_dropout,train_bias)
+                 train_bias: bool = False,
+                 large_rank_warning:bool=True) -> None:
+        LoRAConfigMixin.__init__(self,rank,lora_alpha,lora_dropout,train_bias,large_rank_warning)
         FineTuningStrategy.__init__(self,
                                         [
                                             (fts.mc_cname_equal2("Conv1d"),fts.ma_replace(LoRAConv1d),self.lora_configs()),
@@ -56,6 +61,7 @@ def LoRAAllFineTuningStrategy(
     rank: int = 3, 
     lora_alpha: float | None = None, 
     lora_dropout: float = 0, 
-    train_bias: bool = False):
-    return merger_strategy([LoRALinearFineTuningStrategy(rank,lora_alpha,lora_dropout,train_bias),
-                           LoRAConvFineTuningStrategy(rank,lora_alpha,lora_dropout,train_bias)])
+    train_bias: bool = False,
+    large_rank_warning:bool=True):
+    return merger_strategy([LoRALinearFineTuningStrategy(rank,lora_alpha,lora_dropout,train_bias,large_rank_warning),
+                           LoRAConvFineTuningStrategy(rank,lora_alpha,lora_dropout,train_bias,large_rank_warning)])
