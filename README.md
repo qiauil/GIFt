@@ -1,6 +1,11 @@
-# GIFt: Generic and Intuitive Fine-tuning Library
+<h1 align="center">
+  <img src="assets/images/GIFt.png" width="100"/>
+  <br>GIFt<br>
+</h1>
+<h4 align="center">Generic and Intuitive Fine-tuning Library</h4>
 
-Fine-tuning is a common technique in deep learning to adapt a pre-trained model to a new task. It is widely used in computer vision, natural language processing, and other domains. However, fine-tuning is not always straightforward. It requires a good understanding of the model, the dataset, and the task. In this notebook, we introduce GIFt, a generic and intuitive fine-tuning library that simplifies the process of fine-tuning pre-trained models. GIFt is designed to be easy to use, flexible, and extensible. 
+Fine-tuning is a common technique in deep learning to adapt a pre-trained model to a new task. We introduce GIFt, a generic and intuitive fine-tuning library that simplifies the process of fine-tuning pre-trained models. GIFt is designed to be easy to use, flexible, and extensible. 
+> 🎉GIFt has been used in NeurIPS 2026 paper "Tadpole: Autoencoders as Foundation Models for 3D PDEs with Online Learning". Check [here](https://github.com/tum-pbs/tadpole) for more details. 🎉
 
 ## Quick Start
 
